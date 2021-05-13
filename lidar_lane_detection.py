@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import pyproj as pj
 import pcl
+import math
 from pyproj import Transformer
 from numpy.linalg import norm
 from numpy.polynomial import polynomial as P
@@ -23,7 +24,7 @@ class Lidar:
     #     self.wgs=pj.Proj(init='epsg:4326')  # assuming you're using WGS84 geographic
     #     self.bng=pj.Proj(init='epsg:3857')  # use a locally appropriate projected CRS
 
-    def data(self,data_path):
+    def data_GPS(self,data_path):
         
         data=[]
         with open(data_path) as f:  
@@ -43,6 +44,30 @@ class Lidar:
 
         return pc
 
+
+    def read_data(self,data_path):
+        pointcloud = np.fromfile(str(data_path), dtype=np.float32, count=-1).reshape([-1,4])
+        x = pointcloud[:, 0]  # x position of point
+        y = pointcloud[:, 1]  # y position of point
+        z = pointcloud[:, 2]  # z position of point
+        I = pointcloud[:, 3]  # reflectance value of point
+        d = np.sqrt(x ** 2 + y ** 2)  # Map Distance from sensor
+        
+        data=pd.DataFrame()
+        data['x']=x
+        data['y']=y
+        data['z']=z
+        data['Intensity']=I
+        return data
+
+    def visualize(self,data):
+        plt.figure()
+        plt.xlim(data['x'].min(),data['x'].max())
+        plt.ylim(data['y'].min(),data['y'].max())
+        plt.scatter(data['x'],data['y'],c=data['Intensity'])
+        plt.show()
+ 
+    
 
     def convert_to_xyz(self,lat, lon):
         # France zone 
@@ -70,68 +95,14 @@ class Lidar:
         
         return mean,std,filtered_lanes
 
-    
-    def get_trajectory_line(self,trajectory, min_x,min_y,min_z):
-        trajectory_df = self.data(trajectory)
-        trajectory_df["Latitude"] =pd.to_numeric(trajectory_df["Latitude"] )
-        trajectory_df["Longitude"]=pd.to_numeric(trajectory_df["Longitude"])
-        trajectory_df["Altitude"]=pd.to_numeric(trajectory_df["Altitude"])
-        trajectory_df["Intensity"]=pd.to_numeric(trajectory_df["Intensity"])
-
-        coords=self.convert_to_xyz(trajectory_df["Latitude"],trajectory_df["Longitude"])
-
-        x=[]
-        y=[]
-        # plt.figure()
-        for i in range(len(coords)):
-            # print(coords[i][0],coords[i][1])
-            x.append(coords[i][0])
-            y.append(coords[i][1])
-
-           
-        # # #  data nomalization 
-        # # x=x-min_x 
-        # # y=y-min_y 
-           
-        #  not convertred z but saving xy instead of Latitde and long 
-        # trajectory_df[["Latitude", "Longitude", "Altitude", "Intensity"]].to_csv("./data/trajectory.xyz", index=False)
-        line = "LINESTRING("
-        for i in range(len(x)):
-             line = line + str(x[i]) + " " + str(y[i]) + ", "
-        line = line[:-2] + ")"
-        trajectory_line = wkt.loads(line)
-        # print(trajectory_line)
-        
-        return trajectory_line,x,y
-    
-
-
-  
-    def filter_by_trajectory_line(self,x,y,p):
-        x_filter=[]
-        y_filter=[]
-        f = np.poly1d(p)
-        for i in range(len(x)):
-            ypred=f(x[i])
-            # p3=np.asarray(x[i],y[i])
-            # d = abs((a * x[i] + b * y[i] + c)) / (np.sqrt(a * a + b * b)) 
-            # print("Perpendicular distance is", d)
-            # d = norm(np.cross(p2-p1, p1-p3))/norm(p2-p1)
-            # print(abs(ypred-y[i]))
-            if abs(ypred-y[i])<20:
-                x_filter.append(x[i])
-                y_filter.append(y[i])
-
-        return x_filter,y_filter
-
-
     def find_road_plane(self,points):
 
         cloud = pcl.PointCloud_PointXYZI()
-        cloud.from_array(points.astype('float32'))
-     
+        cloud.from_array(points)
+        
+        print(len(points)/100)
         # find normal plane
-        seg = cloud.make_segmenter_normals(ksearch=50)
+        seg = cloud.make_segmenter_normals(ksearch=len(points)/100)
         seg.set_optimize_coefficients(True)
         seg.set_model_type(pcl.SACMODEL_NORMAL_PLANE)
         seg.set_normal_distance_weight(0.001)
@@ -143,126 +114,66 @@ class Lidar:
         cloud_plane = cloud.extract(indices, negative=False)        
 
         return cloud_plane.to_array(), np.array(indices)
-                    
+        # return 0,0 
 
 if __name__ == '__main__':
     l=Lidar()
-    data=l.data("data/pointcloud.fuse")
-    # print(data)
-    data["Latitude"] =pd.to_numeric(data["Latitude"] )
-    data["Longitude"]=pd.to_numeric(data["Longitude"])
-    data["Altitude"]=pd.to_numeric(data["Altitude"])
-    data["Intensity"]=pd.to_numeric(data["Intensity"])
-    coords= l.convert_to_xyz(data.iloc[:, 0],data.iloc[:, 1])
-    # print(coords)
-    x=[]
-    y=[]
-    # plt.figure()
-    for i in range(len(coords)):
-        # print(coords[i][0],coords[i][1])
-        x.append(coords[i][0])
-        y.append(coords[i][1])
-
-    x=np.asarray(x)
-    y=np.asarray(y)
-
-    data['x']=x
-    data['y']=y
-
-    # print(data)
-
-    # plt.savefig('/home/ashlee/person_project/lidar/lane-detection/rawdata.png')
-   
-# #     # #  filters for point clSoud 
+    data=l.read_data("data_road_velodyne/training/velodyne/um_000051.bin")
+    # l.visualize(data)
     mean,std,data=l.mean_filter(data)
-
-    # plt.xlim(data['x'].min(),data['x'].max())
-    # plt.ylim(data['y'].min(),data['y'].max())
-    # plt.scatter(data['x'],data['y'],c=data['Intensity'])
-    # plt.show()
+  
     
-    #  converting into pointcloud format  xyzI 
+    data=data.to_numpy()
+    db = DBSCAN(eps=1, min_samples=10).fit_predict(data[:,0:2])
+
     p=pd.DataFrame()
-    p['x']=data['x']
-    p['y']=data['y']
-    p['z']=data["Altitude"]- data["Altitude"].min()
-    p['I']=data['Intensity']
-
-    #  convert dataframe to numpy 
-    p=p.to_numpy()
-
-    road_plane, road_plane_idx = l.find_road_plane(p)
-    road_plane_flatten = road_plane[:,0:2]
-
-    # cluster road plane, and find the road segment
-    db = DBSCAN(eps=1, min_samples=100).fit_predict(road_plane_flatten)
-    largest_cluster_label = stats.mode(db).mode[0]
-    largest_cluster_points_idx = np.array(np.where(db == largest_cluster_label)).ravel()
-
-    road_plane_seg_idx = road_plane_idx[largest_cluster_points_idx]
-    
-    # print(len(road_plane_seg_idx),len(road_plane))
-
-#     # print(p[road_plane_seg_idx, :])
-#     # p=np.asarray(p)
-    plt.xlim(p[road_plane_seg_idx,0].min(),p[road_plane_seg_idx,0].max())
-    plt.ylim(p[road_plane_seg_idx,1].min(),p[road_plane_seg_idx,1].max())
-    plt.scatter(p[road_plane_seg_idx,0],p[road_plane_seg_idx,1],c=p[road_plane_seg_idx,3])
+    p['x']=data[:,0]
+    p['y']=data[:,1]
+    p['z']=data[:,2]
+    p['Intensity']=data[:,3]
+    p['label']=db
    
-    trajectory_line,xlane,ylane=l.get_trajectory_line("data/trajectory.fuse",0,0,0)
-   
-    # plt.figure()
-    # plt.xlim(data['x'].min(),data['x'].max())
-    # plt.ylim(data['y'].min(),data['y'].max())
-    # plt.scatter(data['x'],data['y'])
-    # plt.plot(xlane,ylane, linestyle = 'dotted',color="red")
+    p = p[p["label"]>-1 ]
+
+    '''
+     r = sqrt(x*x + y*y + z*z)
+     phi = atan2(y,x)
+     theta = acos(z,r)
+    '''
+    p['r'] = np.sqrt(p['x'] ** 2 + p['y'] ** 2+p['z'] ** 2)
+    #  take only nearby lines into consideration 
     
+    # p = p[p['r']<p['r'].mean()]
 
+    # x_dummy=p['x'].to_numpy()
+    # y_dummy=p['y'].to_numpy()
+    # # print(type(x1))
     
+    p['phi']=np.degrees(np.arctan(p['x']/p['y']))
 
-    p1=(xlane[0],ylane[0])
-    p2=(xlane[8],ylane[8])
-    p1=np.asarray(p1)
-    p2=np.asarray(p2)
-    coef = np.polyfit(xlane, ylane, 1)
-    A = coef[0]
-    B = coef[1]
-    # C = A*xlane[0] + B*ylane[0]
-    
-    # print(f)
-    # plt.plot(x,f(x),color="green")
-    # plt.show()
+    # print('max',abs(p['phi']).max())
+    # print('min',abs(p['phi']).min())
+    # print('mean ',abs(p['phi']).mean())
 
-# #     # print(A,B,C)
-    x_filter,y_filter=l.filter_by_trajectory_line(p[road_plane_seg_idx,0],p[road_plane_seg_idx,1],coef)
-#     print("Intensity - Filtered points: ", len(x_filter))
-#     print("Intensity - Original points: ", len(x))
-#     print("Intensity - Reduction to %:  ", len(x_filter)/len(x))
-
-# #     pc=pd.DataFrame()
-# #     pc["x"]=x_filter
-# #     pc["y"]=y_filter
-
-    plt.scatter(x_filter,y_filter,color="red")
-# #     # plt.savefig('/home/ashlee/Videos/after_trajectoryline_filter.png')
+    # print('data before',p.shape[0],p.shape[1])    
+    # p = p[abs(p['phi'])>50 ]
+    # p=p.to_numpy()
+    # print(p.shape[0],p.shape[1])
+    f, ax = plt.subplots(2,1)
+    ax[0].scatter(p['x'],p['y'],c=p['label'])
+    ax[1].scatter(p['r'],p['phi'],c=p['label'])
     plt.show()
 
-# #     # X =(x_filter,y_filter)
-# #     # X = StandardScaler().fit_transform(X)
 
-# #     # db = DBSCAN(eps=0.006, min_samples=1).fit(X)
-# #     # labels = db.labels_
-# #     # print(labels)
-# #     # n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
-# #     # n_noise_ = list(labels).count(-1)
+    
+    # plt.xlim(data[road_plane_seg_idx,0].min(),data[road_plane_seg_idx,0].max())
+    # plt.ylim(data[road_plane_seg_idx,1].min(),data[road_plane_seg_idx,1].max())
+    # plt.scatter(data[road_plane_seg_idx,0],data[road_plane_seg_idx,1],c=data[road_plane_seg_idx,3])
+    # plt.show()
 
-# #     # # pc["Group"] = labels
-# #     # print(pc.head())
-# #     # print(len(x_filter),len(y_filter),len(labels))
-# # # cluster_df = lanes_df[["Easting", "Northing", "Altitude", "Group"]]
-# # # cluster_df = cluster_df[cluster_df["Group"]>=0]
-# # # cluster_df.to_csv("./data/clustering.xyz",index=False)
-# # # cluster_df.head()
+
+
+  
     
 
 
