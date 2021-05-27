@@ -18,7 +18,7 @@ import pcl
 import struct
 from open3d import *
 from sklearn import linear_model
-
+import math 
 
 def read_data(data_path):
         pointcloud = np.fromfile(str(data_path), dtype=np.float32, count=-1).reshape([-1,4])
@@ -75,6 +75,8 @@ def project_velo_to_cam2(calib):
     return proj_mat
 
 
+
+
 def project_to_image(points, proj_mat):
     """
     Apply the perspective projection
@@ -100,7 +102,9 @@ def render_lidar_on_image(pts_velo, img, calib, img_width, img_height,label):
 
     # Filter lidar points to be within image FOV
     inds = np.where((pts_2d[0, :] < img_width) & (pts_2d[0, :] >= 0) &
-                    (pts_2d[1, :] < img_height) & (pts_2d[1, :] >= 0) )[0]
+                    (pts_2d[1, :] < img_height) & (pts_2d[1, :] >= 0)&
+                    (pts_velo[:, 0] > 0)
+                     )[0]
 
     # Filter out pixels points
     imgfov_pc_pixel = pts_2d[:, inds]
@@ -118,15 +122,16 @@ def render_lidar_on_image(pts_velo, img, calib, img_width, img_height,label):
     ax.imshow(img)
     
     ax.scatter(imgfov_pc_pixel[0], imgfov_pc_pixel[1],s=3,c=label[inds])
+    # ax.label()
     # print(len(label[inds]))
-
-    plt.yticks([])
-    plt.xticks([])
-
+    # plt.yticks([])
+    # plt.xticks([])
 
     # plt.show()
-    # print(label)
-    return imgfov_pc_pixel[0], imgfov_pc_pixel[1],pts_velo[inds,2],pts_velo[inds,3]
+    # X,Y,Z,INTENSITY
+
+    # return imgfov_pc_pixel[0], imgfov_pc_pixel[1],pts_velo[inds,2],pts_velo[inds,3],pts_velo[inds,4]
+    return imgfov_pc_pixel[0], imgfov_pc_pixel[1],pts_velo[inds,2],inds
 
 
 def convert_kitti_bin_to_pcd(binFilePath):
@@ -169,9 +174,17 @@ def find_road_plane(points):
 
     cloud = pcl.PointCloud_PointXYZI()
     cloud.from_array(points.astype('float32'))
+
+
+    fil = cloud.make_passthrough_filter()
+    fil.set_filter_field_name("z")
+    # print(points[:,2].min(),points[:,2].mean(),points[:,2].max())
+    fil.set_filter_limits(points[:,2].min(),0)
+    cloud_filtered = fil.filter()
+
     
      #  create a pcl object 
-    seg = cloud.make_segmenter()
+    seg =  cloud_filtered.make_segmenter()
 
     seg.set_optimize_coefficients(True)
 
@@ -179,7 +192,9 @@ def find_road_plane(points):
 
     seg.set_method_type(pcl.SAC_RANSAC)
 
-    seg.set_distance_threshold(0.5)
+    # seg.set_max_iterations(100)
+
+    seg.set_distance_threshold(0.8)
 
     indices, model = seg.segment()
 
@@ -187,131 +202,96 @@ def find_road_plane(points):
     return cloud_plane.to_array(), np.array(indices)
 
 
-# def peak_intensity_ratio(data,bin):
+# def peak_intensity_ratio(ptCloud,bin_reso):  
     
-#     max_dist=int(data['r'].max())
-#     counts, bins = np.histogram(data['Intensity'])
-#     # plot histogram centered on values 0..255
-#     plt.bar(bins[:-1] - 0.2, counts, width=1, edgecolor='red')
-#     # plt.xlim([-0.5, max_dist])
-#     plt.show()
-#     # plt.style.use('seaborn-white')
+#     bin=5
+#     fo
 
 
-rgb = imageio.imread("data_road/training/image_2/um_000051.png")
-data,lidar=read_data("data_road_velodyne/training/velodyne/um_000051.bin")
-calib = read_calib_file('data_road/training/calib/um_000051.txt')
+
+
+
+
+
+rgb = imageio.imread("data_road/training/image_2/uu_000069.png")
+data,lidar=read_data("data_road_velodyne/training/velodyne/uu_000069.bin")
+calib = read_calib_file('data_road/training/calib/uu_000069.txt')
 
 h, w, c = rgb.shape
 print('before road plane',len(lidar))
-cloud,ind=find_road_plane(lidar[:,0:4])
-
-print(np.unique(cloud[:,2]))
 
 p=pd.DataFrame()
-p['x']=cloud[:,0]
-p['y']=cloud[:,1]
-p['z']=cloud[:,2]
-p['Intensity']=cloud[:,3]
-p['r'] = np.sqrt(p['x'] ** 2 + p['y'] ** 2)
-histBinResolution=0.2
-# peak_intensity_ratio(p,histBinResolution)
+p['x']=lidar[:,0]
+p['y']=lidar[:,1]
+p['z']=lidar[:,2]
+p['Intensity']=lidar[:,3]
+# p['r'] = np.sqrt(p['x'] ** 2 + p['y'] ** 2)
 
-#  adjusting z 
-p['z']=p['z']-p['z'].min()
-# # p = p[p["z"]< p['z'].mean()] 
-# print(p['z'].max())
-# print(p['z'].min())
-# print(p['z'].mean())
-
-
-# p=mean_filter(p)
-# print(p['Intensity'].max())
-# print(p['Intensity'].min())
-# # print(p['Intensity'].mean())
 
 p=p.to_numpy()
+cloud,ind=find_road_plane(p)
+
+print('after road plane',len(cloud))
+# # print(np.unique(cloud[:,2]))
+
+#  make ground plane as 0 z 
+# cloud[:,2]=cloud[:,2]-cloud[:,2].max()
+
+# print(cloud[:,2].min(),cloud[:,2].max())
+
+# x,y,z,intensity,labels=render_lidar_on_image(cloud[:,0:4],rgb, calib, w,h,cloud[:,2])
+
+# plt.savefig('test4.png')
+# plt.show()
+
+
 
 """
     Fit the Data 
 """
 # X = [i for i in zip(['x'],p['y'])]
-X = StandardScaler().fit_transform(p[:,0:2])
+X = StandardScaler().fit_transform(cloud[:,0:3])
 
-db = DBSCAN(eps=0.5, min_samples=100).fit(X)
-# print(type(db))
+# c=np.array(p[:,0:3])
+# print(c.shape[0],c.shape[1])
+
+db = DBSCAN(eps=0.05, min_samples=10).fit(X)
+# # print(type(db))
 db_labels = db.labels_
 
 data=pd.DataFrame()
-data['x']=p[:,0]
-data['y']=p[:,1]
-data['z']=p[:,2]
-data['Intensity']=p[:,3]
+data['x']=cloud[:,0]
+data['y']=cloud[:,1]
+data['z']=cloud[:,2]
+data['Intensity']=cloud[:,3]
 data['labels']=db_labels
+
+# print(data.shape[0],data.shape[1])
 
 
 #   remove noisy point clouds data
-
 labels, cluster_size = np.unique(data['labels'], return_counts=True)
 data = data[data['labels']>=0] 
 
-# retain the largest cluster
-max_label=labels[np.argmax(cluster_size)]
-data = data[data['labels']==max_label] 
-print(max_label,max(cluster_size))
+# # retain the largest cluster
+# max_label=labels[np.argmax(cluster_size)]
+# data = data[data['labels']==max_label] 
+# print(max_label,max(cluster_size))
+
 
 data=data.to_numpy()
-x,y,z,intensity=render_lidar_on_image(data[:,0:4],rgb, calib, w,h,data[:,4])
+x,y,z,index=render_lidar_on_image(data[:,0:4],rgb, calib, w,h,data[:,4])
+plt.figure()
+plt.scatter(data[index,0],data[index,1],c=data[index,3])
+
+# histBinResolution=0.2
+# peak_intensity_ratio(data[index,:],histBinResolution)
+
+
+
 plt.show()
 
 
 
-# p['Intensity']=lidar[:,3]
-# # #################################################    modelling plane  ################################
-# fig = plt.figure("Pointcloud")
-# ax = Axes3D(fig)
-# ax.grid = True
-
-# ax.set_xlabel("X")
-# ax.set_ylabel("Y")
-# ax.set_zlabel("Z")
-
-# # road_plane, road_plane_idx = find_road_plane(lidar)
-# min_x = np.amin(inliers[:, 0])
-# max_x = np.amax(inliers[:, 0])
-# min_y = np.amin(inliers[:, 1])
-# max_y = np.amax(inliers[:, 1])
-
-# x = np.linspace(min_x, max_x)
-# y = np.linspace(min_y, max_y)
-
-# X, Y = np.meshgrid(x, y)
-# Z = a * X + b * Y + d
-# AA = ax.plot_surface(X, Y, Z, cmap='binary', rstride=1, cstride=1, 
-# alpha=1.0)
-# # BB = ax.scatter(outliers[:, 0], outliers[:, 1], outliers[:, 2],c='red', s 
-# # =1)
-# CC = ax.scatter(inliers[:, 0], inliers[:, 1], inliers[:, 2], c='green', 
-# s=1)
 
 
-# road_plane_flatten = road_plane[:,0:2]
-# db = DBSCAN(eps=0.1, min_samples=100).fit_predict(road_plane_flatten)
-
-
-# p=pd.DataFrame()
-# p['x']=lidar[:,0]
-# p['y']=lidar[:,1]
-# p['z']=lidar[:,2]
-# p['Intensity']=lidar[:,3]
-# p['label']=db
-
-# # p['x']=road_plane[:,0]
-# # p['y']=road_plane[:,1]
-# # p['z']=road_plane[:,2]
-# # p['Intensity']=road_plane[:,3]
-# # p['label']=db
-
-# p=p.to_numpy()
-# x1,x2,z,y=render_lidar_on_image(p[:,0:4], rgb, calib, w, h,p[:,4])
-# plt.show()
