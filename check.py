@@ -231,19 +231,95 @@ def peak_intensity_ratio(ptCloud,bin_size):
         ymean.append((y_val[i]+y_val[i+1])/2)
     
 
-    
+    plt.plot(ymean,avg_intensity,'--k')
     return ymean,avg_intensity
-    # plt.plot(ymean,avg_intensity,'--k')
+    
     # plt.show()
 
 
+def findpeaks(hist):
+
+
+    hist.append(100000000)
+    #  pad the array with nan
+    hist=[100000000]+histVal
+
+    # get difference between two adjacent hist values with sign 
+    xdiff = np.diff(hist)
+
+    # Take the sign of the first sample derivative
+    s=np.sign(xdiff)
+
+    # print(s)
+    # print(xdiff)
+    # print(hist)
+
+
+    # Find local maxima
+    targetarr=np.diff(s)
+    peaks=[i for i in range(len(targetarr)) if targetarr[i]<0]
+
+    p1=peaks[0]
+    p2=peaks[1]
+
+    # print(yval[p1],yval[p2])
+
+    plt.plot((yval[p1],yval[p2]),(histVal[p1],histVal[p2]),'*r')
+    
+    return peaks
+
+
+def window_initiaize(y,hist,peaks):
+    left_lane_index=[ i for i in range(len(y)) if y[i]<0]
+    right_lane_index=[ i for i in range(len(y)) if y[i]>=0]
+    
+
+    y_leftLane=[]
+    y_rightLane=[]
+    for ind  in left_lane_index:
+         y_leftLane.append(y[ind])
+    for ind  in right_lane_index:
+         y_rightLane.append(y[ind])
+    
+    laneWidth=8
+    
+
+    # print('original yvals',y)
+    # print(left_lane_index)     
+    # print(y_rightLane,y_leftLane)
+
+    diff = np.zeros([len(left_lane_index),len(right_lane_index)])
+    for i in range(len(left_lane_index)):
+        for j in range(len(right_lane_index)):
+            diff[i][j] = abs(laneWidth - (y_leftLane[i] - y_rightLane[j]))
+    
+
+    arr=np.argwhere(diff == np.min(diff))
+    # print(diff)
+    # print(arr)
+    row=arr[0][0]
+    col=arr[0][1]
+
+    yval = [y_leftLane[row], y_leftLane[col]]
+    estimatedLaneWidth =y_leftLane[row]- y_leftLane[col]
+    print(estimatedLaneWidth)
+
+    return yval
+
+
+def DisplayBins(x_val,y,color):
+    y_val=[y]*len(x_val)
+
+    # print(len(x_val))
+    # print(len(y_val))
+
+    plt.plot(x_val,y_val,c=color)
 
 
 
-
-rgb = imageio.imread("data_road/training/image_2/uu_000069.png")
-data,lidar=read_data("data_road_velodyne/training/velodyne/uu_000069.bin")
-calib = read_calib_file('data_road/training/calib/uu_000069.txt')
+rgb = imageio.imread("data_road/training/image_2/um_000003.png")
+data,lidar=read_data("data_road_velodyne/training/velodyne/um_000003.bin")
+calib = read_calib_file('data_road/training/calib/um_000003.txt')
 
 h, w, c = rgb.shape
 print('before road plane',len(lidar))
@@ -296,12 +372,9 @@ data['labels']=db_labels
 data['r'] = np.sqrt(data['x'] ** 2 + data['y'] ** 2)
 # print(data.shape[0],data.shape[1])
 
-
-
 #   remove noisy point clouds data
 labels, cluster_size = np.unique(data['labels'], return_counts=True)
 data = data[data['labels']>=0] 
-
 
 
 
@@ -326,18 +399,50 @@ data = data[data['labels']>=0]
 
 data=data.to_numpy()
 
-x,y,z,index=render_lidar_on_image(data[:,0:4],rgb, calib, w,h,data[:,5])
-plt.figure()
-# plt.scatter(data[index,0],data[index,1],c=data[index,3])
+# x,y,z,index=render_lidar_on_image(data[:,0:4],rgb, calib, w,h,data[:,5])
+
+
 
 
 # # histBinResolution=3
-peak_intensity_ratio(data,10)
+plt.figure()
+yval,histVal=peak_intensity_ratio(data,5)
+# peaks= findpeaks(histVal) 
+# p1=peaks[0]
+# p2=peaks[1]
+# yval_hist=[yval[p1],yval[p2]]
 
+# yval_estimated=window_initiaize(yval,histVal,peaks)
 
+# print(yval_hist)
+# print(yval_estimated)
 
-# # # x,y,z,index=render_lidar_on_image(data[peak_indexes,0:4],rgb, calib, w,h,data[peak_indexes,4])
-# plt.show()
+x,y,z,index=render_lidar_on_image(data[:,0:4],rgb, calib, w,h,data[:,3])
+
+# # # print(yval)
+
+# plt.figure()
+# plt.scatter(data[index,0],data[index,1])
+# # # plt.scatter(data[p1,0],data[p1,1],s=20, c='red', marker='x')
+# # # plt.scatter(data[p2,0],data[p2,1],s=20, c='red', marker='x')
+
+# # # # plt.plot(x[peaks],y[peaks],c='red')
+
+# x=data[:,0]
+# min_x=math.ceil(x.min())
+# max_x=math.ceil(x.max())
+
+# nbin=max_x-min_x
+
+# # print(nbin)
+# x_val=np.linspace(min_x,max_x,nbin)
+
+# DisplayBins(x_val,yval[p1],'red')
+# DisplayBins(x_val,yval[p2],'green')
+# # plt.plot() 
+
+# # # # # x,y,z,index=render_lidar_on_image(data[peak_indexes,0:4],rgb, calib, w,h,data[peak_indexes,4])
+plt.show()
 
 
 
