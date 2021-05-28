@@ -124,8 +124,8 @@ def render_lidar_on_image(pts_velo, img, calib, img_width, img_height,label):
     ax.scatter(imgfov_pc_pixel[0], imgfov_pc_pixel[1],s=3,c=label[inds])
     # ax.label()
     # print(len(label[inds]))
-    # plt.yticks([])
-    # plt.xticks([])
+    plt.yticks([])
+    plt.xticks([])
 
     # plt.show()
     # X,Y,Z,INTENSITY
@@ -202,11 +202,39 @@ def find_road_plane(points):
     return cloud_plane.to_array(), np.array(indices)
 
 
-# def peak_intensity_ratio(ptCloud,bin_reso):  
-    
-#     bin=5
-#     fo
+def get_index_inrange(arr,start,end):
+    ind=[i for i in range(len(arr)) if arr[i]>=start and arr[i]<end]
+    return ind
 
+def peak_intensity_ratio(ptCloud,bin_size):  
+    
+    y=ptCloud[:,1]
+    min_y=math.ceil(y.min())
+    max_y=math.ceil(y.max())
+
+    y_val=np.linspace(min_y,max_y,bin_size)
+    print(y_val)
+
+    avg_intensity=[]
+    ymean=[]
+    for i in range(len(y_val)-1):
+
+        index=get_index_inrange(y,y_val[i],y_val[i+1])
+        # print(len(index))
+
+        # summing up the intesity 
+        intensity_sum=0
+        for j in index:
+            intensity_sum+=data[j,3]
+
+        avg_intensity.append(intensity_sum)
+        ymean.append((y_val[i]+y_val[i+1])/2)
+    
+
+    
+    return ymean,avg_intensity
+    # plt.plot(ymean,avg_intensity,'--k')
+    # plt.show()
 
 
 
@@ -225,7 +253,7 @@ p['x']=lidar[:,0]
 p['y']=lidar[:,1]
 p['z']=lidar[:,2]
 p['Intensity']=lidar[:,3]
-# p['r'] = np.sqrt(p['x'] ** 2 + p['y'] ** 2)
+
 
 
 p=p.to_numpy()
@@ -265,13 +293,21 @@ data['y']=cloud[:,1]
 data['z']=cloud[:,2]
 data['Intensity']=cloud[:,3]
 data['labels']=db_labels
-
+data['r'] = np.sqrt(data['x'] ** 2 + data['y'] ** 2)
 # print(data.shape[0],data.shape[1])
+
 
 
 #   remove noisy point clouds data
 labels, cluster_size = np.unique(data['labels'], return_counts=True)
 data = data[data['labels']>=0] 
+
+
+
+
+# plt.figure()
+# plt.scatter(data['x'],data['y'],c=data['r'])
+
 
 # # retain the largest cluster
 # max_label=labels[np.argmax(cluster_size)]
@@ -279,17 +315,29 @@ data = data[data['labels']>=0]
 # print(max_label,max(cluster_size))
 
 
+    # break
+#     # if data[i,3]>=data[:,3].mean():
+#     #     c.append('red')
+#     # else:
+#         c.append('green')
+
+
+# c=np.asarray(c)
+
 data=data.to_numpy()
-x,y,z,index=render_lidar_on_image(data[:,0:4],rgb, calib, w,h,data[:,4])
+
+x,y,z,index=render_lidar_on_image(data[:,0:4],rgb, calib, w,h,data[:,5])
 plt.figure()
-plt.scatter(data[index,0],data[index,1],c=data[index,3])
-
-# histBinResolution=0.2
-# peak_intensity_ratio(data[index,:],histBinResolution)
+# plt.scatter(data[index,0],data[index,1],c=data[index,3])
 
 
+# # histBinResolution=3
+peak_intensity_ratio(data,10)
 
-plt.show()
+
+
+# # # x,y,z,index=render_lidar_on_image(data[peak_indexes,0:4],rgb, calib, w,h,data[peak_indexes,4])
+# plt.show()
 
 
 
