@@ -317,9 +317,9 @@ def DisplayBins(x_val,y,color):
 
 
 
-rgb = imageio.imread("data_road/training/image_2/um_000003.png")
-data,lidar=read_data("data_road_velodyne/training/velodyne/um_000003.bin")
-calib = read_calib_file('data_road/training/calib/um_000003.txt')
+rgb = imageio.imread("data_road/training/image_2/uu_000069.png")
+data,lidar=read_data("data_road_velodyne/training/velodyne/uu_000069.bin")
+calib = read_calib_file('data_road/training/calib/uu_000069.txt')
 
 h, w, c = rgb.shape
 print('before road plane',len(lidar))
@@ -401,45 +401,39 @@ data=data.to_numpy()
 
 # x,y,z,index=render_lidar_on_image(data[:,0:4],rgb, calib, w,h,data[:,5])
 
-
-
-
 # # histBinResolution=3
 plt.figure()
-yval,histVal=peak_intensity_ratio(data,5)
-# peaks= findpeaks(histVal) 
-# p1=peaks[0]
-# p2=peaks[1]
-# yval_hist=[yval[p1],yval[p2]]
+yval,histVal=peak_intensity_ratio(data,20)
+peaks= findpeaks(histVal) 
+p1=peaks[0]
+p2=peaks[1]
+yval_hist=[yval[p1],yval[p2]]
 
-# yval_estimated=window_initiaize(yval,histVal,peaks)
+yval_estimated=window_initiaize(yval,histVal,peaks)
 
-# print(yval_hist)
-# print(yval_estimated)
+print(yval_hist)
+print(yval_estimated)
 
 x,y,z,index=render_lidar_on_image(data[:,0:4],rgb, calib, w,h,data[:,3])
 
 # # # print(yval)
 
-# plt.figure()
-# plt.scatter(data[index,0],data[index,1])
-# # # plt.scatter(data[p1,0],data[p1,1],s=20, c='red', marker='x')
-# # # plt.scatter(data[p2,0],data[p2,1],s=20, c='red', marker='x')
+plt.figure()
+plt.scatter(data[index,0],data[index,1],c=data[index,3])
 
-# # # # plt.plot(x[peaks],y[peaks],c='red')
 
-# x=data[:,0]
-# min_x=math.ceil(x.min())
-# max_x=math.ceil(x.max())
+x=data[:,0]
+min_x=math.ceil(x.min())
+max_x=math.ceil(x.max())
 
-# nbin=max_x-min_x
+nbin=max_x-min_x
 
-# # print(nbin)
-# x_val=np.linspace(min_x,max_x,nbin)
+# print(nbin)
+x_val=np.linspace(min_x,max_x,nbin)
 
-# DisplayBins(x_val,yval[p1],'red')
-# DisplayBins(x_val,yval[p2],'green')
-# # plt.plot() 
+DisplayBins(x_val,yval[p1],'red')
+DisplayBins(x_val,yval[p2],'green')
+# plt.plot() 
 
 # # # # # x,y,z,index=render_lidar_on_image(data[peak_indexes,0:4],rgb, calib, w,h,data[peak_indexes,4])
 plt.show()
