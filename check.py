@@ -55,14 +55,11 @@ def mean_filter(pc):
 
         mean = pc["Intensity"].mean()
         std = pc["Intensity"].std()
-
         meanz = pc["z"].min()
         stdz = pc["z"].std()
-
         filtered_lanes = pc[pc["Intensity"] > mean - 1 * std]
         #  remove z as well
         filtered_lanes = filtered_lanes[filtered_lanes["z"] > meanz + stdz ]
-        
         return filtered_lanes
 
 def project_velo_to_cam2(calib):
@@ -75,8 +72,6 @@ def project_velo_to_cam2(calib):
     return proj_mat
 
 
-
-
 def project_to_image(points, proj_mat):
     """
     Apply the perspective projection
@@ -85,10 +80,6 @@ def project_to_image(points, proj_mat):
         proj_mat:   Projection matrix [3, 4]
     """
     num_pts = points.shape[1]
-
-    # Change to homogenous coordinate
-    # points = np.vstack((poin)))
-    # print(points.shape[0], points.shape[1])
     points = proj_mat @ points
     points[:2, :] /= points[2, :]
     return points[:2, :]
@@ -127,10 +118,7 @@ def render_lidar_on_image(pts_velo, img, calib, img_width, img_height,label):
     plt.yticks([])
     plt.xticks([])
 
-    # plt.show()
-    # X,Y,Z,INTENSITY
 
-    # return imgfov_pc_pixel[0], imgfov_pc_pixel[1],pts_velo[inds,2],pts_velo[inds,3],pts_velo[inds,4]
     return imgfov_pc_pixel[0], imgfov_pc_pixel[1],pts_velo[inds,2],inds
 
 
@@ -151,27 +139,6 @@ def convert_kitti_bin_to_pcd(binFilePath):
 
 # running RANSAC Algo
 def find_road_plane(points):
-
-        
-        # XY = points[:, :2]
-        # Z =  points[:, 2]
-        # ransac = linear_model.RANSACRegressor(residual_threshold=0.01)
-        # ransac.fit(XY, Z)
-        # inlier_mask = ransac.inlier_mask_
-        # outlier_mask = np.logical_not(inlier_mask)
-        # inliers = np.zeros(shape=(len(inlier_mask), 4))
-        # outliers = np.zeros(shape=(len(outlier_mask), 4))
-        # a, b = ransac.estimator_.coef_
-        # d = ransac.estimator_.intercept_
-        # for i in range(len(inlier_mask)):
-        #     if not outlier_mask[i]:
-        #         inliers[i] = points[i]
-        #     else:
-        #         outliers[i] = points[i]
-
-        # return a,b,d,inliers,outliers
-
-
     cloud = pcl.PointCloud_PointXYZI()
     cloud.from_array(points.astype('float32'))
 
@@ -185,19 +152,11 @@ def find_road_plane(points):
     
      #  create a pcl object 
     seg =  cloud_filtered.make_segmenter()
-
     seg.set_optimize_coefficients(True)
-
     seg.set_model_type(pcl.SACMODEL_PLANE)
-
     seg.set_method_type(pcl.SAC_RANSAC)
-
-    # seg.set_max_iterations(100)
-
     seg.set_distance_threshold(0.8)
-
     indices, model = seg.segment()
-
     cloud_plane = cloud.extract(indices, negative=False)
     return cloud_plane.to_array(), np.array(indices)
 
@@ -211,18 +170,11 @@ def peak_intensity_ratio(ptCloud,bin_size):
     y=ptCloud[:,1]
     min_y=math.ceil(y.min())
     max_y=math.ceil(y.max())
-
     y_val=np.linspace(min_y,max_y,bin_size)
-    
-
     avg_intensity=[]
     ymean=[]
     for i in range(len(y_val)-1):
-
         index=get_index_inrange(y,y_val[i],y_val[i+1])
-        # print(len(index))
-
-        # summing up the intesity 
         intensity_sum=0
         for j in index:
             intensity_sum+=data[j,3]
@@ -230,14 +182,8 @@ def peak_intensity_ratio(ptCloud,bin_size):
         avg_intensity.append(intensity_sum)
         ymean.append((y_val[i]+y_val[i+1])/2)
     
-
     plt.plot(ymean,avg_intensity,'--k')
-
-
     return ymean,avg_intensity
-    
-    # plt.show()
-
 
 def findpeaks(hist):
 
@@ -245,72 +191,24 @@ def findpeaks(hist):
     hist.append(100000000)
     #  pad the array with nan
     hist=[100000000]+histVal
-
     # get difference between two adjacent hist values with sign 
     xdiff = np.diff(hist)
-
     # Take the sign of the first sample derivative
     s=np.sign(xdiff)
-
-
     # Find local maxima
     targetarr=np.diff(s)
     peaks=[i for i in range(len(targetarr)) if targetarr[i]<0]
-
     p1=peaks[0]
     p2=peaks[1]
-
     # print(yval[p1],yval[p2])
 
     plt.plot((yval[p1],yval[p2]),(histVal[p1],histVal[p2]),'*r')
-    
     return peaks
 
-
-def window_initiaize(y,hist,peaks):
-    left_lane_index=[ i for i in range(len(y)) if y[i]<0]
-    right_lane_index=[ i for i in range(len(y)) if y[i]>=0]
-    
-
-    y_leftLane=[]
-    y_rightLane=[]
-    for ind  in left_lane_index:
-         y_leftLane.append(y[ind])
-    for ind  in right_lane_index:
-         y_rightLane.append(y[ind])
-    
-    laneWidth=8
-    
-
-    # print('original yvals',y)
-    # print(left_lane_index)     
-    # print(y_rightLane,y_leftLane)
-
-    diff = np.zeros([len(left_lane_index),len(right_lane_index)])
-    for i in range(len(left_lane_index)):
-        for j in range(len(right_lane_index)):
-            diff[i][j] = abs(laneWidth - (y_leftLane[i] - y_rightLane[j]))
-    
-
-    arr=np.argwhere(diff == np.min(diff))
-    # print(diff)
-    # print(arr)
-    row=arr[0][0]
-    col=arr[0][1]
-
-    yval = [y_leftLane[row], y_leftLane[col]]
-    estimatedLaneWidth =y_leftLane[row]- y_leftLane[col]
-    # print(estimatedLaneWidth)
-
-    return yval
 
 
 def DisplayBins(x_val,y,color):
     y_val=[y]*len(x_val)
-
-    # print(len(x_val))
-    # print(len(y_val))
-
     plt.plot(x_val,y_val,c=color)
 
 
@@ -322,7 +220,7 @@ def DetectLanes(data,hbin,vbin, start,min_x,max_x):
     # lanes=[]
     laneStartX = np.linspace(min_x,max_x, vbin)
     
-    plt.vlines(laneStartX,-15,15)
+    
 
     startLanePoints=start
 
@@ -331,14 +229,14 @@ def DetectLanes(data,hbin,vbin, start,min_x,max_x):
         # print('after each updation',startLanePoints)
         for j in range(num_lanes):
             laneStartY = startLanePoints[j]
-            print('starting x',laneStartX [i],laneStartX[i+1])
+            # print('starting x',laneStartX [i],laneStartX[i+1])
 
             # roi=[laneStartX[i], laneStartX[i+1], laneStartY - hbin/2, laneStartY + hbin/2, -math.inf, math.inf]
     
 
             lowerbound=math.ceil(laneStartY - hbin)
             upperbound=math.ceil(laneStartY + hbin)
-            print('range y', lowerbound,upperbound)
+            # print('range y', lowerbound,upperbound)
 
             # print('before ',len(data))
 
@@ -346,20 +244,21 @@ def DetectLanes(data,hbin,vbin, start,min_x,max_x):
             inds = np.where((data[:,0] < laneStartX[i+1] )& (data[:,0] >= laneStartX[i]) &
                     (data[:,1] < upperbound) & (data[:,1] >= lowerbound))[0]
             
-            print(len(inds))
-            
-            # if len(inds)!=0:
-            #     plt.scatter(data[inds,0],data[inds,1],c='yellow')
-            #     roi_data=data[inds,:]
-            #     max_intensity=np.argmax(roi_data[:,3].max())
-              
-            #     val=roi_data[max_intensity,:]
-        
-            #     verticalBins[i,:,j]=val
-            #     lanes[i,:,j]=val
-            #     startLanePoints[j]=roi_data[max_intensity,1]
+            # print(len(inds))
+            plt.scatter(data[inds,0],data[inds,1],c='yellow')
 
-            #     plt.scatter(roi_data[max_intensity,0],roi_data[max_intensity,1],s=20,c='hotpink')
+            if len(inds)!=0:
+                plt.vlines(laneStartX[i],-15,15)
+                roi_data=data[inds,:]
+                max_intensity=np.argmax(roi_data[:,3].max())
+                
+                val=roi_data[max_intensity,:]
+        
+                verticalBins[i,:,j]=val
+                lanes[i,:,j]=val
+                startLanePoints[j]=roi_data[max_intensity,1]
+
+                # plt.scatter(roi_data[max_intensity,0],roi_data[max_intensity,1],s=50,c='hotpink')
             
             # else:
             #     value =lanes[:, 0:2, j]
@@ -369,16 +268,32 @@ def DetectLanes(data,hbin,vbin, start,min_x,max_x):
             #     print(' inside the else loop ')
             #     print(lanes[1:,0:2,j])
                 # print(value)
-            break
-        break
 
-      
-        # if i >=2:
-        #     break 
-        #     return 
+    return lanes
+        
 
-
-    # print(lanes)
+def ransac_polyfit(x, y, order=2, n=20, k=100, t=0.1, d=100, f=0.8):
+    # Thanks https://en.wikipedia.org/wiki/Random_sample_consensus
+    
+    # n – minimum number of data points required to fit the model
+    # k – maximum number of iterations allowed in the algorithm
+    # t – threshold value to determine when a data point fits a model
+    # d – number of close data points required to assert that a model fits well to data
+    # f – fraction of close data points required
+  
+    besterr = np.inf
+    bestfit = None
+    for kk in range(len(x)):
+        maybeinliers = np.random.randint(len(x), size=n)
+        maybemodel = np.polyfit(x[maybeinliers], y[maybeinliers], order)
+        alsoinliers = np.abs(np.polyval(maybemodel, x)-y) < t
+        if sum(alsoinliers) > d and sum(alsoinliers) > len(x)*f:
+            bettermodel = np.polyfit(x[alsoinliers], y[alsoinliers], order)
+            thiserr = np.sum(np.abs(np.polyval(bettermodel, x[alsoinliers])-y[alsoinliers]))
+            if thiserr < besterr:
+                bestfit = bettermodel
+                besterr = thiserr
+    return bestfit
 
 
 
@@ -400,21 +315,8 @@ p['y']=lidar[:,1]
 p['z']=lidar[:,2]
 p['Intensity']=lidar[:,3]
 
-
-
 p=p.to_numpy()
 cloud,ind=find_road_plane(p)
-
-print('after road plane',len(cloud))
-# # print(np.unique(cloud[:,2]))
-
-#  make ground plane as 0 z 
-# cloud[:,2]=cloud[:,2]-cloud[:,2].max()
-# print(cloud[:,2].min(),cloud[:,2].max())
-# x,y,z,intensity,labels=render_lidar_on_image(cloud[:,0:4],rgb, calib, w,h,cloud[:,2])
-# plt.savefig('test4.png')
-# plt.show()
-
 
 
 """
@@ -422,9 +324,6 @@ print('after road plane',len(cloud))
 """
 # X = [i for i in zip(['x'],p['y'])]
 X = StandardScaler().fit_transform(cloud[:,0:3])
-
-# c=np.array(p[:,0:3])
-# print(c.shape[0],c.shape[1])
 
 db = DBSCAN(eps=0.05, min_samples=10).fit(X)
 # # print(type(db))
@@ -437,47 +336,18 @@ data['z']=cloud[:,2]
 data['Intensity']=cloud[:,3]
 data['labels']=db_labels
 data['r'] = np.sqrt(data['x'] ** 2 + data['y'] ** 2)
-# print(data.shape[0],data.shape[1])
 
 #   remove noisy point clouds data
 labels, cluster_size = np.unique(data['labels'], return_counts=True)
 # data = data[data['labels']>=0] 
 
-
-
-# plt.figure()
-# plt.scatter(data['x'],data['y'],c=data['r'])
-
-
-# # retain the largest cluster
-# max_label=labels[np.argmax(cluster_size)]
-# data = data[data['labels']==max_label] 
-# print(max_label,max(cluster_size))
-
-
-    # break
-#     # if data[i,3]>=data[:,3].mean():
-#     #     c.append('red')
-#     # else:
-#         c.append('green')
-
-
-# c=np.asarray(c)
-
 data=data.to_numpy()
-
 # x,y,z,index=render_lidar_on_image(data[:,0:4],rgb, calib, w,h,data[:,5])
 
-# # histBinResolution=3
 plt.figure()
 yval,histVal=peak_intensity_ratio(data,30)
-
-# # print(yval)
-# # print(histVal)
 p1=np.argmax(histVal)
-
 temp=histVal[:p1]+histVal[p1+1:]
-# # print(temp)
 max_val=max(temp)
 p2=temp.index(max_val)
 print( ' max y value',yval[p1])
@@ -489,38 +359,11 @@ yval_hist=[yval[p1],yval[p2]]
 plt.plot((yval[p1],yval[p2]),(histVal[p1],histVal[p2]),'*r')
 print( ' the peaks indexes are ',peaks)
 
-
-# peaks= findpeaks(histVal) 
-# p1=peaks[0]
-# p2=peaks[1]
-
-
-yval_estimated=window_initiaize(yval,histVal,peaks)
-
 x,y,z,index=render_lidar_on_image(data[:,0:4],rgb, calib, w,h,data[:,3])
 
 fig,ax = plt.subplots(1)
- #################################################################################
-# # for radius veiw 
-# for i in range(len(data[index])):
-#     data[i,5]=int(data[i,5])
-
-
-# mean_lidar=data[index,3].mean()
-# print(mean_lidar)
-
-
-# color=[]
-# for i in range(len(data)):
-#     if data[i,3]>=mean_lidar:
-#         color.append('red')
-
-#     else:
-#         color.append('blue')
-
-
-######################## ubn commet from here #########################################
 plt.scatter(data[index,0],data[index,1])
+
 plt.ylim(-10,20)
 plt.xlim(0,30)
 
@@ -528,14 +371,11 @@ x=data[index,0]
 min_x=math.ceil(x.min())
 max_x=math.ceil(x.max())
 
-
 nbin=max_x-min_x
 x_val=np.linspace(min_x,max_x,nbin)
 
 DisplayBins(x_val,yval[p1],'red')
 DisplayBins(x_val,yval[p2],'green')
-
-
 DisplayBins(x_val,yval[p2]+2,'yellow')
 DisplayBins(x_val,yval[p2]-2,'yellow')
 DisplayBins(x_val,yval[p1]-2,'yellow')
@@ -543,16 +383,10 @@ DisplayBins(x_val,yval[p1]+2,'yellow')
 
 # print(' lane starting point',yval[p1],yval[p2])
 
-vbin=ceil( data[index,:].max()-data[index,:].min() )
+# vbin=math.ceil( data[index,:].max()-data[index,:].min() )
 arr=[yval[p1],yval[p2]]
 # print(min_x,max_x,nbin)
 lanes =DetectLanes(data[index,0:4],2,30,arr,min_x,max_x)
-
-
-plt.show()
-
-
-# 
 
 
 
