@@ -213,7 +213,7 @@ def peak_intensity_ratio(ptCloud,bin_size):
     max_y=math.ceil(y.max())
 
     y_val=np.linspace(min_y,max_y,bin_size)
-    print(y_val)
+    
 
     avg_intensity=[]
     ymean=[]
@@ -232,6 +232,8 @@ def peak_intensity_ratio(ptCloud,bin_size):
     
 
     plt.plot(ymean,avg_intensity,'--k')
+
+
     return ymean,avg_intensity
     
     # plt.show()
@@ -249,10 +251,6 @@ def findpeaks(hist):
 
     # Take the sign of the first sample derivative
     s=np.sign(xdiff)
-
-    # print(s)
-    # print(xdiff)
-    # print(hist)
 
 
     # Find local maxima
@@ -302,7 +300,7 @@ def window_initiaize(y,hist,peaks):
 
     yval = [y_leftLane[row], y_leftLane[col]]
     estimatedLaneWidth =y_leftLane[row]- y_leftLane[col]
-    print(estimatedLaneWidth)
+    # print(estimatedLaneWidth)
 
     return yval
 
@@ -316,10 +314,82 @@ def DisplayBins(x_val,y,color):
     plt.plot(x_val,y_val,c=color)
 
 
+def DetectLanes(data,hbin,vbin, start,min_x,max_x):
+    num_lanes=2
+    verticalBins = np.zeros((vbin, 4, num_lanes))
+    lanes = np.zeros((vbin, 4, num_lanes))
+    # verticalBins=[]
+    # lanes=[]
+    laneStartX = np.linspace(min_x,max_x, vbin)
+    
+    plt.vlines(laneStartX,-15,15)
 
-rgb = imageio.imread("data_road/training/image_2/uu_000069.png")
-data,lidar=read_data("data_road_velodyne/training/velodyne/uu_000069.bin")
-calib = read_calib_file('data_road/training/calib/uu_000069.txt')
+    startLanePoints=start
+
+    for i in range(vbin-1):
+        # print('for index i',i)
+        # print('after each updation',startLanePoints)
+        for j in range(num_lanes):
+            laneStartY = startLanePoints[j]
+            print('starting x',laneStartX [i],laneStartX[i+1])
+
+            # roi=[laneStartX[i], laneStartX[i+1], laneStartY - hbin/2, laneStartY + hbin/2, -math.inf, math.inf]
+    
+
+            lowerbound=math.ceil(laneStartY - hbin)
+            upperbound=math.ceil(laneStartY + hbin)
+            print('range y', lowerbound,upperbound)
+
+            # print('before ',len(data))
+
+
+            inds = np.where((data[:,0] < laneStartX[i+1] )& (data[:,0] >= laneStartX[i]) &
+                    (data[:,1] < upperbound) & (data[:,1] >= lowerbound))[0]
+            
+            print(len(inds))
+            
+            # if len(inds)!=0:
+            #     plt.scatter(data[inds,0],data[inds,1],c='yellow')
+            #     roi_data=data[inds,:]
+            #     max_intensity=np.argmax(roi_data[:,3].max())
+              
+            #     val=roi_data[max_intensity,:]
+        
+            #     verticalBins[i,:,j]=val
+            #     lanes[i,:,j]=val
+            #     startLanePoints[j]=roi_data[max_intensity,1]
+
+            #     plt.scatter(roi_data[max_intensity,0],roi_data[max_intensity,1],s=20,c='hotpink')
+            
+            # else:
+            #     value =lanes[:, 0:2, j]
+            
+                
+                
+            #     print(' inside the else loop ')
+            #     print(lanes[1:,0:2,j])
+                # print(value)
+            break
+        break
+
+      
+        # if i >=2:
+        #     break 
+        #     return 
+
+
+    # print(lanes)
+
+
+
+
+    ###############################################################
+
+
+
+rgb = imageio.imread("data_road/training/image_2/umm_000014.png")
+data,lidar=read_data("data_road_velodyne/training/velodyne/umm_000014.bin")
+calib = read_calib_file('data_road/training/calib/umm_000014.txt')
 
 h, w, c = rgb.shape
 print('before road plane',len(lidar))
@@ -340,11 +410,8 @@ print('after road plane',len(cloud))
 
 #  make ground plane as 0 z 
 # cloud[:,2]=cloud[:,2]-cloud[:,2].max()
-
 # print(cloud[:,2].min(),cloud[:,2].max())
-
 # x,y,z,intensity,labels=render_lidar_on_image(cloud[:,0:4],rgb, calib, w,h,cloud[:,2])
-
 # plt.savefig('test4.png')
 # plt.show()
 
@@ -374,7 +441,7 @@ data['r'] = np.sqrt(data['x'] ** 2 + data['y'] ** 2)
 
 #   remove noisy point clouds data
 labels, cluster_size = np.unique(data['labels'], return_counts=True)
-data = data[data['labels']>=0] 
+# data = data[data['labels']>=0] 
 
 
 
@@ -403,41 +470,89 @@ data=data.to_numpy()
 
 # # histBinResolution=3
 plt.figure()
-yval,histVal=peak_intensity_ratio(data,20)
-peaks= findpeaks(histVal) 
-p1=peaks[0]
-p2=peaks[1]
+yval,histVal=peak_intensity_ratio(data,30)
+
+# # print(yval)
+# # print(histVal)
+p1=np.argmax(histVal)
+
+temp=histVal[:p1]+histVal[p1+1:]
+# # print(temp)
+max_val=max(temp)
+p2=temp.index(max_val)
+print( ' max y value',yval[p1])
+print( ' second y value',yval[p2])
+
+peaks=[p1,p2]
+
 yval_hist=[yval[p1],yval[p2]]
+plt.plot((yval[p1],yval[p2]),(histVal[p1],histVal[p2]),'*r')
+print( ' the peaks indexes are ',peaks)
+
+
+# peaks= findpeaks(histVal) 
+# p1=peaks[0]
+# p2=peaks[1]
+
 
 yval_estimated=window_initiaize(yval,histVal,peaks)
 
-print(yval_hist)
-print(yval_estimated)
-
 x,y,z,index=render_lidar_on_image(data[:,0:4],rgb, calib, w,h,data[:,3])
 
-# # # print(yval)
+fig,ax = plt.subplots(1)
+ #################################################################################
+# # for radius veiw 
+# for i in range(len(data[index])):
+#     data[i,5]=int(data[i,5])
 
-plt.figure()
-plt.scatter(data[index,0],data[index,1],c=data[index,3])
+
+# mean_lidar=data[index,3].mean()
+# print(mean_lidar)
 
 
-x=data[:,0]
+# color=[]
+# for i in range(len(data)):
+#     if data[i,3]>=mean_lidar:
+#         color.append('red')
+
+#     else:
+#         color.append('blue')
+
+
+######################## ubn commet from here #########################################
+plt.scatter(data[index,0],data[index,1])
+plt.ylim(-10,20)
+plt.xlim(0,30)
+
+x=data[index,0]
 min_x=math.ceil(x.min())
 max_x=math.ceil(x.max())
 
-nbin=max_x-min_x
 
-# print(nbin)
+nbin=max_x-min_x
 x_val=np.linspace(min_x,max_x,nbin)
 
 DisplayBins(x_val,yval[p1],'red')
 DisplayBins(x_val,yval[p2],'green')
-# plt.plot() 
 
-# # # # # x,y,z,index=render_lidar_on_image(data[peak_indexes,0:4],rgb, calib, w,h,data[peak_indexes,4])
+
+DisplayBins(x_val,yval[p2]+2,'yellow')
+DisplayBins(x_val,yval[p2]-2,'yellow')
+DisplayBins(x_val,yval[p1]-2,'yellow')
+DisplayBins(x_val,yval[p1]+2,'yellow')
+
+# print(' lane starting point',yval[p1],yval[p2])
+
+vbin=ceil( data[index,:].max()-data[index,:].min() )
+arr=[yval[p1],yval[p2]]
+# print(min_x,max_x,nbin)
+lanes =DetectLanes(data[index,0:4],2,30,arr,min_x,max_x)
+
+
 plt.show()
 
+
+# 
 
 
 
