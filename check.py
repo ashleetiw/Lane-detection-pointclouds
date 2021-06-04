@@ -129,7 +129,7 @@ def render_lanes_on_image(data,img, calib, img_width, img_height):
     for d in data:
         pts_2d = project_to_image(d.transpose(), proj_velo2cam2)
         inds = np.where((pts_2d[0, :] < img_width) & (pts_2d[0, :] >= 0) &
-                    (pts_2d[1, :] < img_height) & (pts_2d[1, :] >= 0)
+                    (pts_2d[1, :] < img_height) & (pts_2d[1, :] >= 0) & (d[:, 0] > 0)
                      )[0]
 
         # Filter out pixels points
@@ -139,15 +139,17 @@ def render_lanes_on_image(data,img, calib, img_width, img_height):
         imgfov_pc_velo = d[inds, :]
         # imgfov_pc_velo = np.hstack((imgfov_pc_velo, np.ones((imgfov_pc_velo.shape[0], 1))))
         imgfov_pc_cam2 = proj_velo2cam2 @ imgfov_pc_velo.transpose()
-        # Create a figure. Equal aspect so circles look circular
-        
+        # Create a figure. Equal aspect so circles look circular  
         # Show the image
         ax.imshow(img)
-
-        ax.plot(imgfov_pc_pixel[0], imgfov_pc_pixel[1],color='coral', linewidth=3)
+        # if len(imgfov_pc_pixel[0])>0:
+        #     print(imgfov_pc_pixel[0].min(),imgfov_pc_pixel[0].max())
+        #     x_ext = np.linspace(imgfov_pc_pixel[0].min(), imgfov_pc_pixel[0].max(), 100)
+        #     p = np.polyfit(imgfov_pc_pixel[0],imgfov_pc_pixel[1] , deg=2)
+        #     y_ext = np.poly1d(p)(x_ext)
+        ax.plot(imgfov_pc_pixel[0],imgfov_pc_pixel[1],color='coral', linewidth=3)
+        plt.savefig('result/um_000000.png')
        
-
-
     return imgfov_pc_pixel[0], imgfov_pc_pixel[1]
 
 
@@ -214,26 +216,43 @@ def peak_intensity_ratio(ptCloud,bin_size):
     plt.plot(ymean,avg_intensity,'--k')
     return ymean,avg_intensity
 
-def findpeaks(hist):
+# def findpeaks(hist):
 
 
-    hist.append(100000000)
-    #  pad the array with nan
-    hist=[100000000]+histVal
-    # get difference between two adjacent hist values with sign 
-    xdiff = np.diff(hist)
-    # Take the sign of the first sample derivative
-    s=np.sign(xdiff)
-    # Find local maxima
-    targetarr=np.diff(s)
-    peaks=[i for i in range(len(targetarr)) if targetarr[i]<0]
-    p1=peaks[0]
-    p2=peaks[1]
-    # print(yval[p1],yval[p2])
+#     hist.append(100000000)
+#     #  pad the array with nan
+#     hist=[100000000]+histVal
+#     # get difference between two adjacent hist values with sign 
+#     xdiff = np.diff(hist)
+#     # Take the sign of the first sample derivative
+#     s=np.sign(xdiff)
+#     # Find local maxima
+#     targetarr=np.diff(s)
+#     peaks=[i for i in range(len(targetarr)) if targetarr[i]<0]
+#     p1=peaks[0]
+#     p2=peaks[1]
+#     # print(yval[p1],yval[p2])
 
-    plt.plot((yval[p1],yval[p2]),(histVal[p1],histVal[p2]),'*r')
-    return peaks
+#     plt.plot((yval[p1],yval[p2]),(histVal[p1],histVal[p2]),'*r')
+#     return peaks
 
+
+def find_peaks(a):
+    x = np.array(a)
+    max = np.max(x)
+    lenght = len(a)
+    ret = []
+    for i in range(lenght):
+        ispeak = True
+        if i-1 > 0:
+            ispeak &= (x[i] > 1.8 * x[i-1])
+        if i+1 < lenght:
+            ispeak &= (x[i] > 1.8 * x[i+1])
+
+        ispeak &= (x[i] > 0.05 * max)
+        if ispeak:
+            ret.append(i)
+    return ret
 
 
 def DisplayBins(x_val,y,color):
@@ -241,16 +260,13 @@ def DisplayBins(x_val,y,color):
     plt.plot(x_val,y_val,c=color)
 
 
-def DetectLanes(data,hbin,vbin, start,min_x,max_x):
-    num_lanes=2
+def DetectLanes(data,hbin,vbin, start,min_x,max_x,num_lanes):
     verticalBins = np.zeros((vbin, 4, num_lanes))
     lanes = np.zeros((vbin, 4, num_lanes))
     # verticalBins=[]
     # lanes=[]
     laneStartX = np.linspace(min_x,max_x, vbin)
     
-    
-
     startLanePoints=start
 
     for i in range(vbin-1):
@@ -332,9 +348,9 @@ def ransac_polyfit(x, y, order=2, n=20, k=100, t=0.1, d=100, f=0.8):
 
 
 
-rgb = imageio.imread("data_road/training/image_2/umm_000014.png")
-data,lidar=read_data("data_road_velodyne/training/velodyne/umm_000014.bin")
-calib = read_calib_file('data_road/training/calib/umm_000014.txt')
+rgb = imageio.imread("data_road/training/image_2/um_000000.png")
+data,lidar=read_data("data_road_velodyne/training/velodyne/um_000000.bin")
+calib = read_calib_file('data_road/training/calib/um_000000.txt')
 
 h, w, c = rgb.shape
 print('before road plane',len(lidar))
@@ -376,105 +392,107 @@ data=data.to_numpy()
 plt.figure()
 yval,histVal=peak_intensity_ratio(data,30)
 
-################# my peak function ##################
-p1=np.argmax(histVal)
-temp=histVal[:p1]+histVal[p1+1:]
-max_val=max(temp)
-p2=temp.index(max_val)
-print( ' max y value',yval[p1])
-print( ' second y value',yval[p2])
+from scipy.signal import find_peaks
+peaks= find_peaks(histVal)[0]
 
-peaks=[p1,p2]
-yval_hist=[yval[p1],yval[p2]]
-plt.plot((yval[p1],yval[p2]),(histVal[p1],histVal[p2]),'*r')
-print( ' the peaks indexes are ',peaks)
+
+for p in peaks:
+    plt.plot(yval[p],histVal[p],'*r')
+
+################# my peak function ##################
+# p1=np.argmax(histVal)
+# temp=histVal[:p1]+histVal[p1+1:]
+# max_val=max(temp)
+# p2=temp.index(max_val)
+# print( ' max y value',yval[p1])
+# print( ' second y value',yval[p2])
+
+# peaks=[p1,p2]
+# yval_hist=[yval[p1],yval[p2]]
+# plt.plot((yval[p1],yval[p2]),(histVal[p1],histVal[p2]),'*r')
+# print( ' the peaks indexes are ',peaks)
 
 # ################# my peak function ##################
-# print('original datashape',data[:,0:4].shape)
-# x,y,z,index=render_lidar_on_image(data[:,0:4],rgb, calib, w,h,data[:,3])
+print('original datashape',data[:,0:4].shape)
+x,y,z,index=render_lidar_on_image(data[:,0:4],rgb, calib, w,h,data[:,3])
 
-# fig,ax = plt.subplots(1)
-# plt.scatter(data[index,0],data[index,1])
+fig,ax = plt.subplots(1)
+plt.scatter(data[index,0],data[index,1])
 
-# plt.ylim(-20,25)
-# plt.xlim(0,50)
+plt.ylim(-20,25)
+plt.xlim(0,50)
 
-# x=data[index,0]
-# min_x=math.ceil(x.min())
-# max_x=math.ceil(x.max())
+x=data[index,0]
+min_x=math.ceil(x.min())
+max_x=math.ceil(x.max())
 
-# nbin=max_x-min_x
-# x_val=np.linspace(min_x,max_x,nbin)
+nbin=max_x-min_x
+x_val=np.linspace(min_x,max_x,nbin)
 
-# # DisplayBins(x_val,yval[p1],'red')
-# # DisplayBins(x_val,yval[p2],'green')
-# # DisplayBins(x_val,yval[p2]+2,'yellow')
-# # DisplayBins(x_val,yval[p2]-2,'yellow')
-# # DisplayBins(x_val,yval[p1]-2,'yellow')
-# # DisplayBins(x_val,yval[p1]+2,'yellow')
 
-# # print(' lane starting point',yval[p1],yval[p2])
+# vbin=math.ceil( data[index,:].max()-data[index,:].min() )
+arr=[]
+for p in peaks:
+    arr.append(yval[p])
 
-# # vbin=math.ceil( data[index,:].max()-data[index,:].min() )
-# arr=[yval[p1],yval[p2]]
-# # print(min_x,max_x,nbin)
-# lanes =DetectLanes(data[index,0:4],2,30,arr,min_x,max_x)
-# print('lane shape',lanes.shape)
+# print(min_x,max_x,nbin)
+lanes =DetectLanes(data[index,0:4],1,50,arr,min_x,max_x,len(peaks))
+print('lane shape',lanes.shape)
 
-# from sklearn.linear_model import LinearRegression  
-# from sklearn.preprocessing import PolynomialFeatures 
-# from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.linear_model import LinearRegression  
+from sklearn.preprocessing import PolynomialFeatures 
+from sklearn.metrics import mean_squared_error, r2_score
 
-# polynomial_features = PolynomialFeatures(degree = 2)
+polynomial_features = PolynomialFeatures(degree = 2)
 
-# l=[]
-# for i in range(2):
-#     # print(lanes[:,:,i].shape)
-#     lane=lanes[:,:,i]
+l=[]
+for i in range(len(peaks)):
+    # print(lanes[:,:,i].shape)
+    lane=lanes[:,:,i]
+    # lane=[lane[i] for i in range(len(lane)) if lane[i,0]!=0 and lane[i,1]!=0]
+    lane=np.array(lane)
+    print('each lane shape',lane.shape)
+    X_TRANSF=np.reshape(lane[:,0],(len(lane),1))
     
-#     lane=[lane[i] for i in range(len(lane)) if lane[i,0]!=0 and lane[i,1]!=0]
-#     lane=np.array(lane)
-#     # print('each lane shape',lane.shape)
-#     X_TRANSF=np.reshape(lane[:,0],(len(lane),1))
-    
-#     y=np.reshape(lane[:,1],(len(lane),1))
-#     # X_TRANSF = polynomial_features.fit_transform(x)
-#     model = LinearRegression()
-#     model.fit(X_TRANSF,y)
+    y=np.reshape(lane[:,1],(len(lane),1))
+    model = LinearRegression()
+    model.fit(X_TRANSF,y)
 
-#     # Step 4: calculate bias and variance
+    # Step 4: calculate bias and variance
 
-#     Y_NEW = model.predict(X_TRANSF)
+    Y_NEW = model.predict(X_TRANSF)
 
-#     rmse = np.sqrt(mean_squared_error(y,Y_NEW))
-#     r2 = r2_score(y,Y_NEW)
+    # rmse = np.sqrt(mean_squared_error(y,Y_NEW))
+    # r2 = r2_score(y,Y_NEW)
 
-#     # print('RMSE: ', rmse)
-#     # print('R2: ', r2)
+    # print('RMSE: ', rmse)
+    # print('R2: ', r2)
 
-#     Y_NEW = model.predict(X_TRANSF)
+    Y_NEW = model.predict(X_TRANSF)
 
-#     # plt.plot(X_TRANSF, Y_NEW, color='coral', linewidth=3)
+    # plt.plot(X_TRANSF, Y_NEW, color='coral', linewidth=3)
 
-#     print(len(y),len(X_TRANSF),len(Y_NEW))
+    # print(len(y),len(X_TRANSF),len(Y_NEW))
 
-#     # point1=np.hstack((lane[:,0],lane[:,1]))
-#     # point2=np.hstack((lane[:,2],lane[:,3]))
+    # point1=np.hstack((lane[:,0],lane[:,1]))
+    # point2=np.hstack((lane[:,2],lane[:,3]))
 
-#     z=np.ones((len(lane[:,2])))*lane[:,2].min()
-#     point1=np.concatenate((X_TRANSF.reshape(-1,1),Y_NEW.reshape(-1,1)),axis=1)
-#     point2=np.concatenate((z.reshape(-1,1),lane[:,2].reshape(-1,1)),axis=1)
+    print('for each lane min depth',lane[:,2].min())
+    z=np.ones((len(lane[:,2])))*lane[:,2].min()
+    point1=np.concatenate((X_TRANSF.reshape(-1,1),Y_NEW.reshape(-1,1)),axis=1)
+    point2=np.concatenate((z.reshape(-1,1),lane[:,3].reshape(-1,1)),axis=1)
 
    
-#     newpoints=np.concatenate((point1,point2),axis=1)
-#     l.append(newpoints)
-#     # print('line shape',point1.shape)
-#     # print('line shape',point2.shape)
-#     # print('line shape',newpoints.shape)
-#     # break
+    newpoints=np.concatenate((point1,point2),axis=1)
+    l.append(newpoints)
+    # print('line shape',point1.shape)
+    # print('line shape',point2.shape)
+    # print('line shape',newpoints.shape)
+    # break
 
 
-# render_lanes_on_image(l,rgb, calib, w,h)
+render_lanes_on_image(l,rgb, calib, w,h)
+
 # plt.show() 
 
 
