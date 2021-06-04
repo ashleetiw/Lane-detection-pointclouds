@@ -110,8 +110,7 @@ def render_lidar_on_image(pts_velo, img, calib, img_width, img_height,label):
     ax.set_aspect('equal')
 
     # Show the image
-    ax.imshow(img)
-    
+    ax.imshow(img)  
     ax.scatter(imgfov_pc_pixel[0], imgfov_pc_pixel[1],s=3,c=label[inds])
     # ax.label()
     # print(len(label[inds]))
@@ -120,6 +119,36 @@ def render_lidar_on_image(pts_velo, img, calib, img_width, img_height,label):
 
 
     return imgfov_pc_pixel[0], imgfov_pc_pixel[1],pts_velo[inds,2],inds
+
+def render_lanes_on_image(data,img, calib, img_width, img_height):
+    proj_velo2cam2 = project_velo_to_cam2(calib)
+    fig,ax = plt.subplots(1)
+    ax.set_aspect('equal')
+
+
+    for d in data:
+        pts_2d = project_to_image(d.transpose(), proj_velo2cam2)
+        inds = np.where((pts_2d[0, :] < img_width) & (pts_2d[0, :] >= 0) &
+                    (pts_2d[1, :] < img_height) & (pts_2d[1, :] >= 0)
+                     )[0]
+
+        # Filter out pixels points
+        imgfov_pc_pixel = pts_2d[:, inds]
+
+        # Retrieve depth from lidar
+        imgfov_pc_velo = d[inds, :]
+        # imgfov_pc_velo = np.hstack((imgfov_pc_velo, np.ones((imgfov_pc_velo.shape[0], 1))))
+        imgfov_pc_cam2 = proj_velo2cam2 @ imgfov_pc_velo.transpose()
+        # Create a figure. Equal aspect so circles look circular
+        
+        # Show the image
+        ax.imshow(img)
+
+        ax.plot(imgfov_pc_pixel[0], imgfov_pc_pixel[1],color='coral', linewidth=3)
+       
+
+
+    return imgfov_pc_pixel[0], imgfov_pc_pixel[1]
 
 
 def convert_kitti_bin_to_pcd(binFilePath):
@@ -248,7 +277,7 @@ def DetectLanes(data,hbin,vbin, start,min_x,max_x):
             plt.scatter(data[inds,0],data[inds,1],c='yellow')
 
             if len(inds)!=0:
-                plt.vlines(laneStartX[i],-15,15)
+                # plt.vlines(laneStartX[i],-15,15)
                 roi_data=data[inds,:]
                 max_intensity=np.argmax(roi_data[:,3].max())
                 
@@ -258,9 +287,10 @@ def DetectLanes(data,hbin,vbin, start,min_x,max_x):
                 lanes[i,:,j]=val
                 startLanePoints[j]=roi_data[max_intensity,1]
 
-                # plt.scatter(roi_data[max_intensity,0],roi_data[max_intensity,1],s=50,c='hotpink')
+                plt.scatter(roi_data[max_intensity,0],roi_data[max_intensity,1],s=50,c='hotpink')
             
             # else:
+            #     print('no points',laneStartX[i])
             #     value =lanes[:, 0:2, j]
             
                 
@@ -342,10 +372,11 @@ labels, cluster_size = np.unique(data['labels'], return_counts=True)
 # data = data[data['labels']>=0] 
 
 data=data.to_numpy()
-# x,y,z,index=render_lidar_on_image(data[:,0:4],rgb, calib, w,h,data[:,5])
 
 plt.figure()
 yval,histVal=peak_intensity_ratio(data,30)
+
+################# my peak function ##################
 p1=np.argmax(histVal)
 temp=histVal[:p1]+histVal[p1+1:]
 max_val=max(temp)
@@ -354,39 +385,97 @@ print( ' max y value',yval[p1])
 print( ' second y value',yval[p2])
 
 peaks=[p1,p2]
-
 yval_hist=[yval[p1],yval[p2]]
 plt.plot((yval[p1],yval[p2]),(histVal[p1],histVal[p2]),'*r')
 print( ' the peaks indexes are ',peaks)
 
-x,y,z,index=render_lidar_on_image(data[:,0:4],rgb, calib, w,h,data[:,3])
+# ################# my peak function ##################
+# print('original datashape',data[:,0:4].shape)
+# x,y,z,index=render_lidar_on_image(data[:,0:4],rgb, calib, w,h,data[:,3])
 
-fig,ax = plt.subplots(1)
-plt.scatter(data[index,0],data[index,1])
+# fig,ax = plt.subplots(1)
+# plt.scatter(data[index,0],data[index,1])
 
-plt.ylim(-10,20)
-plt.xlim(0,30)
+# plt.ylim(-20,25)
+# plt.xlim(0,50)
 
-x=data[index,0]
-min_x=math.ceil(x.min())
-max_x=math.ceil(x.max())
+# x=data[index,0]
+# min_x=math.ceil(x.min())
+# max_x=math.ceil(x.max())
 
-nbin=max_x-min_x
-x_val=np.linspace(min_x,max_x,nbin)
+# nbin=max_x-min_x
+# x_val=np.linspace(min_x,max_x,nbin)
 
-DisplayBins(x_val,yval[p1],'red')
-DisplayBins(x_val,yval[p2],'green')
-DisplayBins(x_val,yval[p2]+2,'yellow')
-DisplayBins(x_val,yval[p2]-2,'yellow')
-DisplayBins(x_val,yval[p1]-2,'yellow')
-DisplayBins(x_val,yval[p1]+2,'yellow')
+# # DisplayBins(x_val,yval[p1],'red')
+# # DisplayBins(x_val,yval[p2],'green')
+# # DisplayBins(x_val,yval[p2]+2,'yellow')
+# # DisplayBins(x_val,yval[p2]-2,'yellow')
+# # DisplayBins(x_val,yval[p1]-2,'yellow')
+# # DisplayBins(x_val,yval[p1]+2,'yellow')
 
-# print(' lane starting point',yval[p1],yval[p2])
+# # print(' lane starting point',yval[p1],yval[p2])
 
-# vbin=math.ceil( data[index,:].max()-data[index,:].min() )
-arr=[yval[p1],yval[p2]]
-# print(min_x,max_x,nbin)
-lanes =DetectLanes(data[index,0:4],2,30,arr,min_x,max_x)
+# # vbin=math.ceil( data[index,:].max()-data[index,:].min() )
+# arr=[yval[p1],yval[p2]]
+# # print(min_x,max_x,nbin)
+# lanes =DetectLanes(data[index,0:4],2,30,arr,min_x,max_x)
+# print('lane shape',lanes.shape)
+
+# from sklearn.linear_model import LinearRegression  
+# from sklearn.preprocessing import PolynomialFeatures 
+# from sklearn.metrics import mean_squared_error, r2_score
+
+# polynomial_features = PolynomialFeatures(degree = 2)
+
+# l=[]
+# for i in range(2):
+#     # print(lanes[:,:,i].shape)
+#     lane=lanes[:,:,i]
+    
+#     lane=[lane[i] for i in range(len(lane)) if lane[i,0]!=0 and lane[i,1]!=0]
+#     lane=np.array(lane)
+#     # print('each lane shape',lane.shape)
+#     X_TRANSF=np.reshape(lane[:,0],(len(lane),1))
+    
+#     y=np.reshape(lane[:,1],(len(lane),1))
+#     # X_TRANSF = polynomial_features.fit_transform(x)
+#     model = LinearRegression()
+#     model.fit(X_TRANSF,y)
+
+#     # Step 4: calculate bias and variance
+
+#     Y_NEW = model.predict(X_TRANSF)
+
+#     rmse = np.sqrt(mean_squared_error(y,Y_NEW))
+#     r2 = r2_score(y,Y_NEW)
+
+#     # print('RMSE: ', rmse)
+#     # print('R2: ', r2)
+
+#     Y_NEW = model.predict(X_TRANSF)
+
+#     # plt.plot(X_TRANSF, Y_NEW, color='coral', linewidth=3)
+
+#     print(len(y),len(X_TRANSF),len(Y_NEW))
+
+#     # point1=np.hstack((lane[:,0],lane[:,1]))
+#     # point2=np.hstack((lane[:,2],lane[:,3]))
+
+#     z=np.ones((len(lane[:,2])))*lane[:,2].min()
+#     point1=np.concatenate((X_TRANSF.reshape(-1,1),Y_NEW.reshape(-1,1)),axis=1)
+#     point2=np.concatenate((z.reshape(-1,1),lane[:,2].reshape(-1,1)),axis=1)
+
+   
+#     newpoints=np.concatenate((point1,point2),axis=1)
+#     l.append(newpoints)
+#     # print('line shape',point1.shape)
+#     # print('line shape',point2.shape)
+#     # print('line shape',newpoints.shape)
+#     # break
+
+
+# render_lanes_on_image(l,rgb, calib, w,h)
+# plt.show() 
 
 
 
