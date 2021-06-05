@@ -1,49 +1,13 @@
 #!/usr/bin/env python3
 
-import copy
 import numpy as np
 import pandas as pd
-import pyproj as pj
-import pcl
-import math
-from pyproj import Transformer
-from numpy.linalg import norm
-from numpy.polynomial import polynomial as P
-from sklearn.preprocessing import StandardScaler
-from scipy import stats
-from sklearn.cluster import KMeans, DBSCAN
-from shapely import wkt
-import utm 
 import matplotlib.pyplot as plt
-import matplotlib.colors as clr
 from mpl_toolkits.mplot3d import Axes3D
+import pcl
+
 
 class Lidar:
-    # def __init(self):
-    #     #  projections setup
-    #     self.wgs=pj.Proj(init='epsg:4326')  # assuming you're using WGS84 geographic
-    #     self.bng=pj.Proj(init='epsg:3857')  # use a locally appropriate projected CRS
-
-    def data_GPS(self,data_path):
-        
-        data=[]
-        with open(data_path) as f:  
-            line = f.readline()
-            while line:
-                d = line.split()
-                data.append(d)
-                line = f.readline()
-
-        raw_data = np.array(data)
-        #  converting raw data into tabular -readable form 
-        pc = pd.DataFrame()
-        pc["Latitude"] = raw_data[:,0]
-        pc["Longitude"] = raw_data[:,1]
-        pc["Altitude"] =  raw_data[:,2]
-        pc["Intensity"] = raw_data[:,3]
-
-        return pc
-
 
     def read_data(self,data_path):
         pointcloud = np.fromfile(str(data_path), dtype=np.float32, count=-1).reshape([-1,4])
@@ -58,9 +22,9 @@ class Lidar:
         data['y']=y
         data['z']=z
         data['Intensity']=I
-        return data
+        return data,pointcloud
 
-    def visualize(self,data):
+    def visualize_lidar_data(self,data):
         plt.figure()
         plt.xlim(data['x'].min(),data['x'].max())
         plt.ylim(data['y'].min(),data['y'].max())
@@ -68,113 +32,165 @@ class Lidar:
         plt.show()
  
     
-
-    def convert_to_xyz(self,lat, lon):
-        # France zone 
-        P = pj.Proj(proj='utm', zone=31, ellps='WGS84', preserve_units=False)
-        x, y =P(lat,lon)
-
-        # transformer = Transformer.from_crs('epsg:4269','epsg:4326',always_xy=True)
-        points = list(zip(x,y))
-        # coordsWgs = np.array(list(transformer.itransform(points)))
-        
-        return points
-
-    def convert_to_latlon(self,x,y):
-        lat, lon = pj.transform(self.bng, self.wgs, x, y)
-        return lat,lon
-
-
     def mean_filter(self,pc):
 
         mean = pc["Intensity"].mean()
         std = pc["Intensity"].std()
+        meanz = pc["z"].min()
+        stdz = pc["z"].std()
+        filtered_lanes = pc[pc["Intensity"] > mean - 1 * std]
+        #  remove z as well
+        filtered_lanes = filtered_lanes[filtered_lanes["z"] > meanz + stdz ]
+        return filtered_lanes
 
-        filtered_lanes = pc[pc["Intensity"] > mean + 1 * std]
-        filtered_lanes = filtered_lanes[filtered_lanes["Intensity"] < mean + 7 * std ]
-        
-        return mean,std,filtered_lanes
-
+    # running RANSAC Algo
     def find_road_plane(self,points):
-
         cloud = pcl.PointCloud_PointXYZI()
-        cloud.from_array(points)
-        
-        print(len(points)/100)
-        # find normal plane
-        seg = cloud.make_segmenter_normals(ksearch=len(points)/100)
+        cloud.from_array(points.astype('float32'))
+
+        fil = cloud.make_passthrough_filter()
+        fil.set_filter_field_name("z")
+        # print(points[:,2].min(),points[:,2].mean(),points[:,2].max())
+        fil.set_filter_limits(points[:,2].min(),0)
+        cloud_filtered = fil.filter()
+
+        #  create a pcl object 
+        seg =  cloud_filtered.make_segmenter()
         seg.set_optimize_coefficients(True)
-        seg.set_model_type(pcl.SACMODEL_NORMAL_PLANE)
-        seg.set_normal_distance_weight(0.001)
+        seg.set_model_type(pcl.SACMODEL_PLANE)
         seg.set_method_type(pcl.SAC_RANSAC)
-        seg.set_max_iterations(100)
-        seg.set_distance_threshold(0.3)
+        seg.set_distance_threshold(0.8)
         indices, model = seg.segment()
-
-        cloud_plane = cloud.extract(indices, negative=False)        
-
+        cloud_plane = cloud.extract(indices, negative=False)
         return cloud_plane.to_array(), np.array(indices)
-        # return 0,0 
 
-if __name__ == '__main__':
-    l=Lidar()
-    data=l.read_data("data_road_velodyne/training/velodyne/um_000051.bin")
-    # l.visualize(data)
-    mean,std,data=l.mean_filter(data)
+    
+
+class Image:
+    def read_calib_file(self,filepath):
+        data = {}
+        with open(filepath, 'r') as f:
+            for line in f.readlines():
+                line = line.rstrip()
+                if len(line) == 0: continue
+                key, value = line.split(':', 1)
+                # The only non-float values in these files are dates, which
+                # we don't care about anyway
+                try:
+                    data[key] = np.array([float(x) for x in value.split()])
+                except ValueError:
+                    pass
+
+        return data
+
+
+    
+    def project_velo_to_cam2(self,calib):
+        P_velo2cam_ref = np.vstack((calib['Tr_velo_to_cam'].reshape(3, 4), np.array([0., 0., 0., 1.])))  # velo2ref_cam
+        R_ref2rect = np.eye(4)
+        R0_rect = calib['R0_rect'].reshape(3, 3)  # ref_cam2rect
+        R_ref2rect[:3, :3] = R0_rect
+        P_rect2cam2 = calib['P2'].reshape((3, 4))
+        proj_mat = P_rect2cam2 @ R_ref2rect @ P_velo2cam_ref
+        return proj_mat
+
+
+    def project_to_image(self,points, proj_mat):
+        """
+        Apply the perspective projection
+        Args:
+            pts_3d:     3D points in camera coordinate [3, npoints]
+            proj_mat:   Projection matrix [3, 4]
+        """
+        num_pts = points.shape[1]
+        points = proj_mat @ points
+        points[:2, :] /= points[2, :]
+        return points[:2, :]
+
+    # def convert_kitti_bin_to_pcd(binFilePath):
+    #     size_float = 4
+    #     list_pcd = []
+    #     with open(binFilePath, "rb") as f:
+    #         byte = f.read(size_float * 4)
+    #         while byte:
+    #             x, y, z, intensity = struct.unpack("ffff", byte)
+    #             list_pcd.append([x, y, z])
+    #             byte = f.read(size_float * 4)
+    #     np_pcd = np.asarray(list_pcd)
+    #     pcd = pcl.PointCloud()
+    #     pcd = open3d.utility.Vector3dVector(np_pcd)
+    #     return pcd
+
+
+    def render_lidar_on_image(self,pts_velo, img, calib, img_width, img_height,label):
+        # projection matrix (project from velo2cam2)
+        proj_velo2cam2 = self.project_velo_to_cam2(calib)
+
+        # # apply projection
+        pts_2d = self.project_to_image(pts_velo.transpose(), proj_velo2cam2)
+
+        # Filter lidar points to be within image FOV
+        inds = np.where((pts_2d[0, :] < img_width) & (pts_2d[0, :] >= 0) &
+                        (pts_2d[1, :] < img_height) & (pts_2d[1, :] >= 0)&
+                        (pts_velo[:, 0] > 0)
+                        )[0]
+
+        # Filter out pixels points
+        imgfov_pc_pixel = pts_2d[:, inds]
+
+        # Retrieve depth from lidar
+        imgfov_pc_velo = pts_velo[inds, :]
+        # imgfov_pc_velo = np.hstack((imgfov_pc_velo, np.ones((imgfov_pc_velo.shape[0], 1))))
+        imgfov_pc_cam2 = proj_velo2cam2 @ imgfov_pc_velo.transpose()
+
+        # Create a figure. Equal aspect so circles look circular
+        fig,ax = plt.subplots(1)
+        ax.set_aspect('equal')
+
+        # Show the image
+        ax.imshow(img)  
+        ax.scatter(imgfov_pc_pixel[0], imgfov_pc_pixel[1],s=3,c=label[inds])
+        # ax.label()
+        # print(len(label[inds]))
+        plt.yticks([])
+        plt.xticks([])
+
+
+        return imgfov_pc_pixel[0], imgfov_pc_pixel[1],pts_velo[inds,2],inds
+
+
   
-    
-    data=data.to_numpy()
-    db = DBSCAN(eps=1, min_samples=10).fit_predict(data[:,0:2])
-
-    p=pd.DataFrame()
-    p['x']=data[:,0]
-    p['y']=data[:,1]
-    p['z']=data[:,2]
-    p['Intensity']=data[:,3]
-    p['label']=db
-   
-    p = p[p["label"]>-1 ]
-
-    '''
-     r = sqrt(x*x + y*y + z*z)
-     phi = atan2(y,x)
-     theta = acos(z,r)
-    '''
-    p['r'] = np.sqrt(p['x'] ** 2 + p['y'] ** 2+p['z'] ** 2)
-    #  take only nearby lines into consideration 
-    
-    # p = p[p['r']<p['r'].mean()]
-
-    # x_dummy=p['x'].to_numpy()
-    # y_dummy=p['y'].to_numpy()
-    # # print(type(x1))
-    
-    p['phi']=np.degrees(np.arctan(p['x']/p['y']))
-
-    # print('max',abs(p['phi']).max())
-    # print('min',abs(p['phi']).min())
-    # print('mean ',abs(p['phi']).mean())
-
-    # print('data before',p.shape[0],p.shape[1])    
-    # p = p[abs(p['phi'])>50 ]
-    # p=p.to_numpy()
-    # print(p.shape[0],p.shape[1])
-    f, ax = plt.subplots(2,1)
-    ax[0].scatter(p['x'],p['y'],c=p['label'])
-    ax[1].scatter(p['r'],p['phi'],c=p['label'])
-    plt.show()
+    def render_lanes_on_image(self,data,img, calib, img_width, img_height,figg):
+        proj_velo2cam2 = self.project_velo_to_cam2(calib)
+        fig,ax = plt.subplots(1)
+        ax.set_aspect('equal')
 
 
-    
-    # plt.xlim(data[road_plane_seg_idx,0].min(),data[road_plane_seg_idx,0].max())
-    # plt.ylim(data[road_plane_seg_idx,1].min(),data[road_plane_seg_idx,1].max())
-    # plt.scatter(data[road_plane_seg_idx,0],data[road_plane_seg_idx,1],c=data[road_plane_seg_idx,3])
-    # plt.show()
+        for d in data:
+            pts_2d = self.project_to_image(d.transpose(), proj_velo2cam2)
+            inds = np.where((pts_2d[0, :] < img_width) & (pts_2d[0, :] >= 0) &
+                        (pts_2d[1, :] < img_height) & (pts_2d[1, :] >= 0) & (d[:, 0] > 0)
+                        )[0]
 
+            # Filter out pixels points
+            imgfov_pc_pixel = pts_2d[:, inds]
 
-
-  
-    
+            # Retrieve depth from lidar
+            imgfov_pc_velo = d[inds, :]
+            # imgfov_pc_velo = np.hstack((imgfov_pc_velo, np.ones((imgfov_pc_velo.shape[0], 1))))
+            imgfov_pc_cam2 = proj_velo2cam2 @ imgfov_pc_velo.transpose()
+            # Create a figure. Equal aspect so circles look circular  
+            # Show the image
+            ax.imshow(img)
+            # if len(imgfov_pc_pixel[0])>0:
+            #     print(imgfov_pc_pixel[0].min(),imgfov_pc_pixel[0].max())
+            #     x_ext = np.linspace(imgfov_pc_pixel[0].min(), imgfov_pc_pixel[0].max(), 100)
+            #     p = np.polyfit(imgfov_pc_pixel[0],imgfov_pc_pixel[1] , deg=2)
+            #     y_ext = np.poly1d(p)(x_ext)
+            ax.plot(imgfov_pc_pixel[0],imgfov_pc_pixel[1],color='coral', linewidth=3)
+            plt.savefig('result/'+figg+'.png')
+        
+        return imgfov_pc_pixel[0], imgfov_pc_pixel[1]
 
 
 
