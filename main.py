@@ -14,6 +14,9 @@ from sklearn.preprocessing import PolynomialFeatures
 from sklearn.metrics import mean_squared_error, r2_score
 from scipy.signal import find_peaks
 from convert_lidar_to_paranomicview import overlay
+import numpy.polynomial.polynomial as poly
+
+
 
 def remove_noise(data):
     """
@@ -41,39 +44,47 @@ def remove_noise(data):
 def fit_polynomial(lanes,peaks):
     polynomial_features = PolynomialFeatures(degree = 2)
     l=[]
+    
     for i in range(len(peaks)):
         # print(lanes[:,:,i].shape)
         lane=lanes[:,:,i]
-        # lane=[lane[i] for i in range(len(lane)) if lane[i,0]!=0 and lane[i,1]!=0]
-        lane=np.array(lane)
-        print('each lane shape',lane.shape)
-        X_TRANSF=np.reshape(lane[:,0],(-1,1))
-        y=np.reshape(lane[:,1],(-1,1))
-        model = LinearRegression()
-        model.fit(X_TRANSF,y)
+        # lane=[lane[i,:] for i in range(len(lane)) if len(lane[i])>0]
+        
+        # X_TRANSF=np.reshape(lane[:,0],(-1,1))
+        # y=np.reshape(lane[:,1],(-1,1))
+        lane=[lane[i,:] for i in range(len(lane)) if lane[i,0]!=0 and lane[i,1]!=0]
+        lane=np.array(lane).reshape(-1,4)
+        x=lane[:,0]
+        y=lane[:,1]
+       
+        if len(x)>0 and len(y)>0:
+            coefs =  poly.polyfit(x,y,2)
+            X_NEW=np.linspace(x.min()+5,x.max(),70)
+            # X_NEW=x
+            ffit = poly.Polynomial(coefs)
+            Y_NEW=ffit(X_NEW)
+            # print('for each lane min depth',lane[:,2].min())
+            z=np.ones(len(X_NEW))*(lane[:,2].mean())
+            # print('lane[:,2].min()',lane[:,2].min())
+            # for i in range(len(X_NEW)):
+            #     new=(lane[:,2].min())/(len(X_NEW)-i+1)
+            #     z[i]=new 
 
-        X_NEW=np.linspace(0,X_TRANSF.max()+10,70)
-        X_NEW=np.reshape(X_NEW,(len(X_NEW),1))
-        # X_NEW=X_TRANSF
-        Y_NEW = model.predict(X_NEW)
-
-        print('for each lane min depth',lane[:,2].min())
-        z=np.ones(len(X_NEW))
-        print('lane[:,2].min()',lane[:,2].min())
-        for i in range(len(X_NEW)):
-            new=(lane[:,2].min())/(len(X_NEW)-i+1)
-            z[i]=new 
-        intensity=np.ones(len(X_NEW))*lane[:,3].mean()
+            # # print('mean',lane[:,2].mean())
+            intensity=np.ones(len(X_NEW))*lane[:,3].mean()
    
+            point1=np.concatenate((X_NEW.reshape(-1,1),Y_NEW.reshape(-1,1)),axis=1)
+            point2=np.concatenate((z.reshape(-1,1),intensity.reshape(-1,1)),axis=1)
 
+            newpoints=np.concatenate((point1,point2),axis=1)
+            l.append(newpoints)
 
-        point1=np.concatenate((X_NEW.reshape(-1,1),Y_NEW.reshape(-1,1)),axis=1)
-        point2=np.concatenate((z.reshape(-1,1),intensity.reshape(-1,1)),axis=1)
-
-        newpoints=np.concatenate((point1,point2),axis=1)
-        l.append(newpoints)
+            # print(abs(Y_NEW-y))
+        
+        # break
     
     return l
+    # return np.array(l).reshape(-1,4,len(peaks))
 
 
 
@@ -81,93 +92,97 @@ def fit_polynomial(lanes,peaks):
 import os
 
 
-# filenames = os.listdir('vtarget_lane')
+filenames = os.listdir('umm')
 # # # filename='data_road/training/image_2/umm_000011.png'
 
-# for filename in filenames:
-#     filename=filename.replace('.png',"")
+for filename in filenames:
+    filename=filename.replace('.png',"")
 
-filename='uu_000031'
+# filename='um_000066'
 
-rgb = imageio.imread('data_road/training/image_2/'+ filename+'.png')
-
-
-l=Lidar()
-im=Image()
-data,lidar=l.read_data("data_road_velodyne/training/velodyne/"+filename+".bin")
-calib = im.read_calib_file('data_road/training/calib/'+filename+'.txt')
-
-h, w, c = rgb.shape
-print('before road plane',len(data))
+    rgb = imageio.imread('data_road/training/image_2/'+ filename+'.png')
 
 
-data=data.to_numpy()
-cloud,ind=l.find_road_plane(data)
+    l=Lidar()
+    im=Image()
+    data,lidar=l.read_data("data_road_velodyne/training/velodyne/"+filename+".bin")
+    calib = im.read_calib_file('data_road/training/calib/'+filename+'.txt')
 
-data=remove_noise(cloud)
+    h, w, c = rgb.shape
 
-data=data.to_numpy()
-print('after road plane and noise removal',len(data))
+    # im.render_lidar_on_image(lidar,rgb, calib,w,h)
 
+    data=data.to_numpy()
+    cloud,ind=l.find_road_plane(data)
 
-###############  fidinding the lanes ############
+    data=remove_noise(cloud)
 
-plt.figure()
-lane=Lane()
-yval,histVal=lane.peak_intensity_ratio(data,50)
-
-
-peaks= find_peaks(histVal)[0]
-
-for p in peaks:
-    plt.plot(yval[p],histVal[p],'*r')
+    data=data.to_numpy()
+    print('after road plane and noise removal',len(data))
 
 
-##################
-x,y,z,index=im.render_lidar_on_image(data[:,0:4],rgb, calib, w,h,data[:,3])
-fig,ax = plt.subplots(1)
-plt.scatter(data[index,0],data[index,1])
-# plt.ylim(-20,)
-plt.xlim(0,50)
+    # ###############  fidinding the lanes ############
+
+    # plt.figure()
+    lane=Lane()
+    yval,histVal=lane.peak_intensity_ratio(data,50)
+
+    peaks= find_peaks(histVal)[0]
+    # peaks=lane.find_peaks(histVal)
+
+    for p in peaks:
+        plt.plot(yval[p],histVal[p],'*r')
 
 
-x=data[:,0]
-min_x=math.ceil(x.min())
-max_x=math.ceil(x.max())
+    # ##################
+    x,y,z,index=im.render_lidar_on_image(data[:,0:4],rgb, calib, w,h,data[:,3])
 
-nbin=max_x-min_x
-x_val=np.linspace(min_x,max_x,nbin)
 
-arr=[]
-for p in peaks:
-    arr.append(yval[p])
-for y in arr:   
-    lane.DisplayBins(x_val,y,'red')
+    fig,ax = plt.subplots(1)
+    plt.scatter(data[index,0],data[index,1],color='yellow')
+    # plt.ylim(-20,)
+    plt.xlim(0,50)
 
-lanes =lane.DetectLanes(data[index,0:4],2,50,arr,min_x,max_x,len(peaks))
-# print(len(lanes))
+    x=data[:,0]
+    min_x=math.ceil(x.min())
+    max_x=math.ceil(x.max())
 
-fitted_lane=fit_polynomial(lanes,peaks)
+    nbin=max_x-min_x
+    x_val=np.linspace(min_x,max_x,nbin)
 
-# o=overlay()
+    arr=[]
+    for p in peaks:
+        arr.append(yval[p])
+    # for y in arr:   
+    #     lane.DisplayBins(x_val,y,'red')
+    # lane.find_peaks()
 
-# fitted_lane=np.array(fitted_lane)
-# print(fitted_lane.type)
+    lanes =lane.DetectLanes(data[index,0:4],1,50,arr,min_x,max_x,len(peaks))
 
-# v_fov, h_fov = (-24.9, 2.0),(-180,180)
-# pano_img = o.velo_points_2_pano(fitted_lane, v_res=0.42, h_res=0.35, v_fov=v_fov, h_fov=h_fov, depth = True)
+    no_of_lanes_detected=lanes.shape[2]
 
-# # display result image
-# plt.subplots(1,1, figsize = (13,3) )
-# plt.title("Result of Vertical FOV ({} , {}) & Horizontal FOV ({} , {})".format(v_fov[0],v_fov[1],h_fov[0],h_fov[1]))
-# plt.imshow(pano_img)
-# plt.axis('off')
-# plt.show()
-# print(pano_img.shape)
+    new_lanes=np.zeros(no_of_lanes_detected)
 
-im.render_lanes_on_image(fitted_lane,rgb, calib, w,h,filename)
+    for i in range(no_of_lanes_detected):
+        l=lanes[:,:,i]
+        
+        l=[l[i,:] for i in range(len(l)) if l[i,0]!=0 and l[i,1]!=0]
+        
+        l=np.array(l).reshape(-1,4) 
 
-# plt.show()
+        plt.plot(l[:,0],l[:,1],color='blue')
+        
+        
+    # im.render_lanes_on_image(lanes,rgb, calib, w,h,filename)
+
+    fitted_lane=fit_polynomial(lanes,peaks)
+
+    for d in fitted_lane:
+        plt.plot(d[:,0],d[:,1],color='red')
+        
+    im.render_lanes_on_image(fitted_lane,rgb, calib, w,h,filename)
+
+    # plt.show()
 
 
 

@@ -82,52 +82,43 @@ class Lane:
         laneStartX = np.linspace(min_x,max_x, vbin)
         
         startLanePoints=start
-
-        for i in range(vbin-1):
+        
             # print('for index i',i)
             # print('after each updation',startLanePoints)
-            for j in range(num_lanes):
+        for j in range(num_lanes):
+
                 laneStartY = startLanePoints[j]
                 # print('starting x',laneStartX [i],laneStartX[i+1])
 
                 # roi=[laneStartX[i], laneStartX[i+1], laneStartY - hbin/2, laneStartY + hbin/2, -math.inf, math.inf]
-        
 
                 lowerbound=math.ceil(laneStartY - hbin)
                 upperbound=math.ceil(laneStartY + hbin)
                 # print('range y', lowerbound,upperbound)
 
                 # print('before ',len(data))
+                for i in range(vbin-1):
 
 
-                inds = np.where((data[:,0] < laneStartX[i+1] )& (data[:,0] >= laneStartX[i]) &
-                        (data[:,1] < upperbound) & (data[:,1] >= lowerbound))[0]
-                
-                # print(len(inds))
-                # plt.scatter(data[inds,0],data[inds,1],c='yellow')
-
-                if len(inds)!=0:
-                    # plt.vlines(laneStartX[i],-15,15)
-                    roi_data=data[inds,:]
-                    max_intensity=np.argmax(roi_data[:,3].max())
+                    inds = np.where((data[:,0] < laneStartX[i+1] )& (data[:,0] >= laneStartX[i]) &
+                            (data[:,1] < upperbound) & (data[:,1] >= lowerbound) )[0]
                     
-                    val=roi_data[max_intensity,:]
-            
-                    verticalBins[i,:,j]=val
-                    lanes[i,:,j]=val
-                    startLanePoints[j]=roi_data[max_intensity,1]
+                    # print(len(inds))
+                    # plt.scatter(data[inds,0],data[inds,1],c='yellow')
 
-                    plt.scatter(roi_data[max_intensity,0],roi_data[max_intensity,1],s=50,c='hotpink')
+                    if len(inds)!=0:
+                        # plt.vlines(laneStartX[i],-15,15)
+                        roi_data=data[inds,:]
+                        max_intensity=np.argmax(roi_data[:,3].max())
+                        
+                        val=roi_data[max_intensity,:]
                 
-                # else:
-                #     print('no points',laneStartX[i])
-                #     value =lanes[:, 0:2, j]
-                
-                    
-                    
-                #     print(' inside the else loop ')
-                #     print(lanes[1:,0:2,j])
-                    # print(value)
+                        verticalBins[i,:,j]=val
+                        lanes[i,:,j]=val
+                        startLanePoints[j]=roi_data[max_intensity,1]
 
+                        plt.scatter(roi_data[max_intensity,0],roi_data[max_intensity,1],s=3,c='hotpink')
+                        # plt.plot(roi_data[max_intensity,0],roi_data[max_intensity,1],color='green')
+                 
         return lanes
             

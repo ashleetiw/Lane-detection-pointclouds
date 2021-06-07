@@ -59,7 +59,7 @@ class Lidar:
         seg.set_optimize_coefficients(True)
         seg.set_model_type(pcl.SACMODEL_PLANE)
         seg.set_method_type(pcl.SAC_RANSAC)
-        seg.set_distance_threshold(0.8)
+        seg.set_distance_threshold(0.3)
         indices, model = seg.segment()
         cloud_plane = cloud.extract(indices, negative=False)
         return cloud_plane.to_array(), np.array(indices)
@@ -156,7 +156,7 @@ class Image:
 
         # Show the image
         ax.imshow(img)  
-        ax.scatter(imgfov_pc_pixel[0], imgfov_pc_pixel[1],s=3,c=label[inds])
+        ax.scatter(imgfov_pc_pixel[0], imgfov_pc_pixel[1],s=3)
         # ax.label()
         # print(len(label[inds]))
         plt.yticks([])
@@ -178,13 +178,14 @@ class Image:
         proj_velo2cam2 = self.project_velo_to_cam2(calib)
         fig,ax = plt.subplots(1)
         ax.set_aspect('equal')
-        # imgfov_pc_pixel=[[],[]]
         
+        
+        # for i in range(data.shape[2]):
+        #     d=data[:,:,i]
         for d in data:
             pts_2d = self.project_to_image(d.transpose(), proj_velo2cam2)
-            inds = np.where((pts_2d[0, :] < img_width) & (pts_2d[0, :] >= 0) &
-                        (pts_2d[1, :] < img_height) & (pts_2d[1, :] >= 0)
-                        )[0]
+            inds = np.where((pts_2d[0, :] < img_width) & (pts_2d[0, :] > 0) &
+                        (pts_2d[1, :] < img_height) & (pts_2d[1,:]>0)  )[0]
 
             # print(inds)
 
@@ -198,8 +199,9 @@ class Image:
             # Create a figure. Equal aspect so circles look circular  
             # Show the image
             ax.imshow(img)
-            ax.scatter(imgfov_pc_pixel[0],imgfov_pc_pixel[1],color='coral', linewidth=3)
-            plt.savefig('result/'+figg+'.png')
+            ax.scatter(imgfov_pc_pixel[0],imgfov_pc_pixel[1],color='coral')
+        
+        plt.savefig('result_umm/'+figg+'.png')
         
         # return imgfov_pc_pixel[0], imgfov_pc_pixel[1]
 
