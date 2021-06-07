@@ -64,7 +64,12 @@ class Lidar:
         cloud_plane = cloud.extract(indices, negative=False)
         return cloud_plane.to_array(), np.array(indices)
 
-    
+    def running_mean(self,x, N):
+        """ x == an array of data. N == number of samples per average """
+        cumsum = np.cumsum(np.insert(x, 0, 0)) 
+        return (cumsum[N:] - cumsum[:-N]) / float(N)       
+
+
 
 class Image:
     def read_calib_file(self,filepath):
@@ -104,7 +109,9 @@ class Image:
         """
         num_pts = points.shape[1]
         points = proj_mat @ points
+        
         points[:2, :] /= points[2, :]
+        # points[:2, :]=np.nan_to_num(points[:2, :]) 
         return points[:2, :]
 
     # def convert_kitti_bin_to_pcd(binFilePath):
@@ -161,16 +168,25 @@ class Image:
 
   
     def render_lanes_on_image(self,data,img, calib, img_width, img_height,figg):
+        """
+        Overlay lane lines on the original frame
+        :param: Plot the lane lines if True
+        :return: Lane with overlay
+        """
+
+        print('data in lane_image fucntion',len(data))
         proj_velo2cam2 = self.project_velo_to_cam2(calib)
         fig,ax = plt.subplots(1)
         ax.set_aspect('equal')
-
-
+        # imgfov_pc_pixel=[[],[]]
+        
         for d in data:
             pts_2d = self.project_to_image(d.transpose(), proj_velo2cam2)
             inds = np.where((pts_2d[0, :] < img_width) & (pts_2d[0, :] >= 0) &
-                        (pts_2d[1, :] < img_height) & (pts_2d[1, :] >= 0) & (d[:, 0] > 0)
+                        (pts_2d[1, :] < img_height) & (pts_2d[1, :] >= 0)
                         )[0]
+
+            # print(inds)
 
             # Filter out pixels points
             imgfov_pc_pixel = pts_2d[:, inds]
@@ -182,15 +198,12 @@ class Image:
             # Create a figure. Equal aspect so circles look circular  
             # Show the image
             ax.imshow(img)
-            # if len(imgfov_pc_pixel[0])>0:
-            #     print(imgfov_pc_pixel[0].min(),imgfov_pc_pixel[0].max())
-            #     x_ext = np.linspace(imgfov_pc_pixel[0].min(), imgfov_pc_pixel[0].max(), 100)
-            #     p = np.polyfit(imgfov_pc_pixel[0],imgfov_pc_pixel[1] , deg=2)
-            #     y_ext = np.poly1d(p)(x_ext)
-            ax.plot(imgfov_pc_pixel[0],imgfov_pc_pixel[1],color='coral', linewidth=3)
+            ax.scatter(imgfov_pc_pixel[0],imgfov_pc_pixel[1],color='coral', linewidth=3)
             plt.savefig('result/'+figg+'.png')
         
-        return imgfov_pc_pixel[0], imgfov_pc_pixel[1]
+        # return imgfov_pc_pixel[0], imgfov_pc_pixel[1]
+
+    
 
 
 
