@@ -5,10 +5,10 @@ This example shows how to detect lanes in lidar point cloud.Lidar lane detection
 Used The KITTI Vision road dataset for lane detection 
 
 ``2D visualization``
-![Demonstration](https://github.com/ashleetiw/Lane-detection-pointclouds/blob/main/2d_visualization.png)
+![Demonstration](https://github.com/ashleetiw/Lane-detection-pointclouds/blob/main/2d_original_img.png)
 
 ``3D visualization``
-![Demonstration](https://github.com/ashleetiw/Lane-detection-pointclouds/blob/main/3d_visualization.png)
+![Demonstration](https://github.com/ashleetiw/Lane-detection-pointclouds/blob/main/original_pcl.png)
 
 
 **ALGORITHM** 
@@ -20,14 +20,14 @@ Lane detection in lidar involves detection of lanes with respect to the lidar se
 -`remove_noise` function uses DBSCAN clustering to remove noise from pointclouds data
 -` render_lidar_on_image` in class `Image` retains only pointlcouds which overlays only within the range (0,image_width) and (*0,image_height)
 
-![Demonstration](https://github.com/ashleetiw/Lane-detection-pointclouds/blob/main/roi.png)
+![Demonstration](https://github.com/ashleetiw/Lane-detection-pointclouds/blob/main/img/lidarpoints.png)
 
 ### Ground plane segmentation
 Requirement `pip install python-pcl`
 simple plane segmentation of a set of points, that is to find all the points within a point cloud that support a plane model. 
 I am using the ransac algorithm to segment the ground plane lidar rings using python pcl library .
-* Note: In order to retain a dense pointclouds retaning pointclouds in range (z-epsilon,z+epsilon) where epsilon is a tunable parameter *
-![Demonstration](https://github.com/ashleetiw/Lane-detection-pointclouds/blob/main/preprocess.png)
+* Note: In order to retain a dense pointclouds retaning pointclouds in range (z-epsilon,z+epsilon) where epsilon is a tunable parameter 
+![Demonstration](https://github.com/ashleetiw/Lane-detection-pointclouds/blob/main/img/groundplane.png)
 
 ## Lane Point Detection
 `Class Lane`  in detect_lanes.py contains methods to detect lane points from the pointcloud data 
@@ -37,20 +37,23 @@ Lane points in the lidar point cloud have a distinct distribution of intensities
 `peak_intensity_ratio` :Creates a histogram of intensity points. Control the number of bins for the histogram by specifying the bin resolution.
 `find_peaks` :Obtains peaks in the histogram  
 
-![Demonstration](https://github.com/ashleetiw/Lane-detection-pointclouds/blob/main/hist.png)
+![Demonstration](https://github.com/ashleetiw/Lane-detection-pointclouds/blob/main/img/intensity_histogram.png)
 
 ### lane detection
 `DetectLanes`:detects lane datapoints where the initial estimates for the sliding windows are made using an intensity-based histogram.
-![Demonstration](https://github.com/ashleetiw/Lane-detection-pointclouds/blob/main/window_searchresult.png)
+<!-- ![Demonstration](https://github.com/ashleetiw/Lane-detection-pointclouds/blob/main/window_searchresult.png) -->
 
 ## Polynomial fitting 
 **Parabolic Polynomial Fitting**
 The polynomial is fitted on X-Y points using a 2-degree polynomial represented as `ax2+bx+c`, where a, b, and c are polynomial parameters
 To perform curve fitting, use the `fit_polynomial` function
-![Demonstration](https://github.com/ashleetiw/Lane-detection-pointclouds/blob/main/lanes.png)
+![Demonstration](https://github.com/ashleetiw/Lane-detection-pointclouds/blob/main/img/scatter2dplot_fittedlanes.png)
 
 ## Image and lidar data visualization
 `Class Image` performs tranformation from 3d pointlouds to 2d pixel points to project lidardata on top of rgb image 
+
+![Demonstration](https://github.com/ashleetiw/Lane-detection-pointclouds/blob/main/img/lanelines.png)
+
 
 **DEMONSTRATION** 
 
