@@ -1,10 +1,10 @@
-#  Real-Time Road Lane Detection in Urban Areas on sparse 3d point cloud
+#  Real-Time Road Lane Detection in Urban Areas on sparse 3D Point Cloud Data
 This example shows how to detect lanes in real time using lidar point cloud .
-The approach used was detecting lanes using windows sliding search from  a multi-aspect airborne laser scanning point clouds which were recorded in a forward looking view.Since the resolution of the point cloud is low,deep learing approach or ML-unsueprvised learning will not work .Although Clustering has been used but for filtering out noise
+The approach used was detecting lanes using windows sliding search from  a multi-aspect airborne laser scanning point clouds which were recorded in a forward looking view.Since the resolution of the point cloud is low,deep learing approach or ML-unsueprvised learning will not work .Although Clustering has been used but for filtering out noise.
 
 ![Demonstration](https://github.com/ashleetiw/Lane-detection-pointclouds/blob/main/demo.gif)
 
-**Data visualization** 
+## Data visualization 
 Used The KITTI Vision road dataset for lane detection 
 
 ``2D visualization``
@@ -14,7 +14,7 @@ Used The KITTI Vision road dataset for lane detection
 ![Demonstration](https://github.com/ashleetiw/Lane-detection-pointclouds/blob/main/img/original_pcl.png)
 
 
-**ALGORITHM** 
+## ALGORITHM** 
 Lane detection in lidar involves detection of the immediate left and right lanes, also known as ego vehicle lanes, with respect to the lidar sensor. The flowchart gives an overview of the workflow 
 ![Demonstration](https://github.com/ashleetiw/Lane-detection-pointclouds/blob/main/img/flowdiagram.png)
 
@@ -39,14 +39,14 @@ Lane points in the lidar point cloud have a distinct distribution of intensities
 `peak_intensity_ratio` :Creates a histogram of intensity points. Control the number of bins for the histogram by specifying the bin resolution.
 `find_peaks` :Obtains peaks in the histogram  
 
-![Demonstration](https://github.com/ashleetiw/Lane-detection-pointclouds/blob/main/img/intensity_histogram.png){:height="50%" width="50%"}
+![Demonstration](https://github.com/ashleetiw/Lane-detection-pointclouds/blob/main/img/intensity_histogram.png)
 
 ### lane detection
 `DetectLanes`: peaks in the density of the  point clouds are used to detect the windows.Sliding Window approach is used to detect lanes from each window 
 <!-- ![Demonstration](https://github.com/ashleetiw/Lane-detection-pointclouds/blob/main/window_searchresult.png) -->
 
 ## Polynomial fitting 
-**Parabolic Polynomial Fitting**
+### Parabolic Polynomial Fitting
 The polynomial is fitted on X-Y points using a 2-degree polynomial represented as `ax2+bx+c`, where a, b, and c are polynomial parameters
 To perform curve fitting, use the `fit_polynomial` function
 ![Demonstration](https://github.com/ashleetiw/Lane-detection-pointclouds/blob/main/img/scatter2dplot_fittedlanes.png){:height="50%" width="50%"}
@@ -56,7 +56,7 @@ To perform curve fitting, use the `fit_polynomial` function
 ![Demonstration](https://github.com/ashleetiw/Lane-detection-pointclouds/blob/main/img/lanelines.png)
 
 
-**DEMONSTRATION** 
+## DEMONSTRATION 
 Lane detection is performed on realtime data collection by alidar mounted on top of a vehicle and its correspoding 2d plot shows the variation in density of point clouds with lanes detected 
 ![Demonstration](https://github.com/ashleetiw/Lane-detection-pointclouds/blob/main/output.gif)
 ![Demonstration](https://github.com/ashleetiw/Lane-detection-pointclouds/blob/main/output2d.gif)
