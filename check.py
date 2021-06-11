@@ -208,7 +208,7 @@ def peak_intensity_ratio(ptCloud,bin_size):
         index=get_index_inrange(y,y_val[i],y_val[i+1])
         intensity_sum=0
         for j in index:
-            intensity_sum+=data[j,3]
+            intensity_sum+=ptCloud[j,3]
 
         avg_intensity.append(intensity_sum)
         ymean.append((y_val[i]+y_val[i+1])/2)
@@ -493,7 +493,7 @@ for i in range(len(peaks)):
 
 render_lanes_on_image(l,rgb, calib, w,h)
 
-# plt.show() 
+plt.show() 
 
 
 
