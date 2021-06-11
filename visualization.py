@@ -1,17 +1,12 @@
 #!/usr/bin/env python3
+'''
+Visualization code for pointcloud data and image data  
+'''
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+import imageio
 
-colors = {
-    'Car': 'b',
-    'Tram': 'r',
-    'Cyclist': 'g',
-    'Van': 'c',
-    'Truck': 'm',
-    'Pedestrian': 'y',
-    'Sitter': 'k'
-}
 axes_limits = [
     [-20, 80], # X axis range
     [-20, 20], # Y axis range
@@ -19,41 +14,17 @@ axes_limits = [
 ]
 axes_str = ['X', 'Y', 'Z']
 
-# def draw_box(pyplot_axis, vertices, axes=[0, 1, 2], color='black'):
-  
-#     vertices = vertices[axes, :]
-#     connections = [
-#         [0, 1], [1, 2], [2, 3], [3, 0],  # Lower plane parallel to Z=0 plane
-#         [4, 5], [5, 6], [6, 7], [7, 4],  # Upper plane parallel to Z=0 plane
-#         [0, 4], [1, 5], [2, 6], [3, 7]  # Connections between upper and lower planes
-#     ]
-#     for connection in connections:
-#         pyplot_axis.plot(*vertices[:, connection], c=color, lw=0.5)
-
-
-    
-import imageio
-
-
-dataset_gray0 = imageio.imread("data_road_gray/training/image_0/um_000051.png")
-dataset_gray1 =imageio.imread("data_road_gray/training/image_1/um_000051.png")
-dataset_rgb = imageio.imread("data_road/training/image_2/um_000051.png")
-dataset_velo = np.fromfile(str("data_road_velodyne/training/velodyne/um_000051.bin"), dtype=np.float32, count=-1).reshape([-1,4])
+dataset_gray0 = imageio.imread("data_road_gray/training/image_0/um_000069.png")
+dataset_gray1 =imageio.imread("data_road_gray/training/image_1/um_000069.png")
+dataset_rgb = imageio.imread("data_road/training/image_2/um_000069.png")
+dataset_velo = np.fromfile(str("data_road_velodyne/training/velodyne/um_000069.bin"), dtype=np.float32, count=-1).reshape([-1,4])
 
 x = dataset_velo[:, 0]  # x position of point
 y = dataset_velo[:, 1]  # y position of point
 z = dataset_velo[:, 2]  # z position of point
 r = dataset_velo[:, 3]  # reflectance value of point
 d = np.sqrt(x ** 2 + y ** 2)  # Map Distance from sensor
- 
- 
-# vals='height'
-# if vals == "height":
-#     col = z
-# else:
-#     col = d
- 
-# # plt.scatter(x,y,c=r
+
 
 # Draw camera data
 f, ax = plt.subplots(2,2, figsize=(15, 5))

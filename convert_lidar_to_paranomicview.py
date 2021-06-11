@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
+'''
+   Helper method to visulaize lidar point cloud data to bird's eye view
+'''
 import numpy as np
 import matplotlib.pyplot as plt
 
 class overlay:
 
     def load_from_bin(self,bin_path):
+        '''  reads data '''
         obj = np.fromfile(bin_path, dtype=np.float32).reshape(-1, 4)
         # ignore reflectivity info
         return obj[:,:3]

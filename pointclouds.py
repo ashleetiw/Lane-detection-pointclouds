@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-
+''' 
+Contains Helper class for lidar pointcloud processing and Lidar-Camera Projection
+'''
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -8,8 +10,13 @@ import pcl
 
 
 class Lidar:
-
+    '''Class Lidar contains methods for processing and visualizing point cloud
+        Each 3-D point cloud consists of XYZ locations along with intensity information
+    '''
+    
     def read_data(self,data_path):
+        ''' reads point cloud data '''
+
         pointcloud = np.fromfile(str(data_path), dtype=np.float32, count=-1).reshape([-1,4])
         x = pointcloud[:, 0]  # x position of point
         y = pointcloud[:, 1]  # y position of point
@@ -24,27 +31,28 @@ class Lidar:
         data['Intensity']=I
         return data,pointcloud
 
-    def visualize_lidar_data(self,data):
+    def visualize_lidar_data(self,pc):
+        ''' 2D visualization of pointclouds '''
         plt.figure()
-        plt.xlim(data['x'].min(),data['x'].max())
-        plt.ylim(data['y'].min(),data['y'].max())
-        plt.scatter(data['x'],data['y'],c=data['Intensity'])
+        plt.xlim(pc['x'].min(),pc['x'].max())
+        plt.ylim(pc['y'].min(),pc['y'].max())
+        plt.scatter(pc['x'],pc['y'],c=pc['Intensity'])
         plt.show()
  
     
-    def mean_filter(self,pc):
+    def z_filter(self,pc):
+        ''' filtering pointcloud with height above a threshold '''
 
-        mean = pc["Intensity"].mean()
-        std = pc["Intensity"].std()
         meanz = pc["z"].min()
         stdz = pc["z"].std()
-        filtered_lanes = pc[pc["Intensity"] > mean - 1 * std]
-        #  remove z as well
-        filtered_lanes = filtered_lanes[filtered_lanes["z"] > meanz + stdz ]
+        filtered_lanes = filtered_lanes[filtered_lanes["z"] < meanz + stdz ]
         return filtered_lanes
 
-    # running RANSAC Algo
+   
     def find_road_plane(self,points):
+        '''
+            RANSAC Algorithm to segment ground plane 
+        '''
         cloud = pcl.PointCloud_PointXYZI()
         cloud.from_array(points.astype('float32'))
 
@@ -59,7 +67,7 @@ class Lidar:
         seg.set_optimize_coefficients(True)
         seg.set_model_type(pcl.SACMODEL_PLANE)
         seg.set_method_type(pcl.SAC_RANSAC)
-        seg.set_distance_threshold(0.3)
+        seg.set_distance_threshold(0.8)
         indices, model = seg.segment()
         cloud_plane = cloud.extract(indices, negative=False)
         return cloud_plane.to_array(), np.array(indices)
@@ -72,7 +80,9 @@ class Lidar:
 
 
 class Image:
+    '''Class Image contains methods for converting 3D pointcloud data to 2D pixels '''
     def read_calib_file(self,filepath):
+        ''' Read in a calibration file and parse into a dictionary'''
         data = {}
         with open(filepath, 'r') as f:
             for line in f.readlines():
@@ -91,6 +101,10 @@ class Image:
 
     
     def project_velo_to_cam2(self,calib):
+        ''' Create a projection matrix 
+        Args: 
+            calib: calibration data 
+        '''
         P_velo2cam_ref = np.vstack((calib['Tr_velo_to_cam'].reshape(3, 4), np.array([0., 0., 0., 1.])))  # velo2ref_cam
         R_ref2rect = np.eye(4)
         R0_rect = calib['R0_rect'].reshape(3, 3)  # ref_cam2rect
@@ -101,12 +115,12 @@ class Image:
 
 
     def project_to_image(self,points, proj_mat):
-        """
+        '''
         Apply the perspective projection
         Args:
             pts_3d:     3D points in camera coordinate [3, npoints]
             proj_mat:   Projection matrix [3, 4]
-        """
+        '''
         num_pts = points.shape[1]
         points = proj_mat @ points
         
@@ -130,6 +144,9 @@ class Image:
 
 
     def render_lidar_on_image(self,pts_velo, img, calib, img_width, img_height,label):
+        '''
+            Overlay pointcloud data on the original rgb frame
+        '''
         # projection matrix (project from velo2cam2)
         proj_velo2cam2 = self.project_velo_to_cam2(calib)
 
@@ -156,7 +173,7 @@ class Image:
 
         # Show the image
         ax.imshow(img)  
-        ax.scatter(imgfov_pc_pixel[0], imgfov_pc_pixel[1],s=3)
+        ax.scatter(imgfov_pc_pixel[0], imgfov_pc_pixel[1],s=3,c=label[inds])
         # ax.label()
         # print(len(label[inds]))
         plt.yticks([])
@@ -170,8 +187,6 @@ class Image:
     def render_lanes_on_image(self,data,img, calib, img_width, img_height,figg):
         """
         Overlay lane lines on the original frame
-        :param: Plot the lane lines if True
-        :return: Lane with overlay
         """
 
         print('data in lane_image fucntion',len(data))
@@ -199,9 +214,9 @@ class Image:
             # Create a figure. Equal aspect so circles look circular  
             # Show the image
             ax.imshow(img)
-            ax.scatter(imgfov_pc_pixel[0],imgfov_pc_pixel[1],color='coral')
+            ax.plot(imgfov_pc_pixel[0],imgfov_pc_pixel[1],color='red',linewidth=8)
         
-        plt.savefig('result_umm/'+figg+'.png')
+        plt.savefig('video/'+figg+'.png')
         
         # return imgfov_pc_pixel[0], imgfov_pc_pixel[1]
 

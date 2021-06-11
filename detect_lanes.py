@@ -1,11 +1,21 @@
 #!/usr/bin/env python3
+'''
+   Contains helper methods for Lane point detection from point cloud data 
+   
+'''
 import numpy as np
 import matplotlib.pyplot as plt
 import math 
 
 class Lane:
+    '''  
+    Detect lane points by using a sliding window search where the initial estimates for the sliding windows are made using an intensity-based histogram
+    '''
+
     def peak_intensity_ratio(self,ptCloud,bin_size):  
-        
+        '''
+        creates a histogram of intensity points. control the number of bins for the histogram by specifying the bin_size
+        '''
         y=ptCloud[:,1]
         min_y=math.ceil(y.min())
         max_y=math.ceil(y.max())
@@ -19,41 +29,40 @@ class Lane:
                 intensity_sum+=ptCloud[j,3]
 
             avg_intensity.append(intensity_sum)
-            ymean.append((y_val[i]+y_val[i+1])/2)
+            ymean.append((y_val[i]+y_vaDetect lane points by using a sliding window search, where the initial estimates for the sliding windows are made using an intensity-based histogram.l[i+1])/2)
         
         plt.plot(ymean,avg_intensity,'--k')
         return ymean,avg_intensity
 
     def get_index_inrange(self,arr,start,end):
+        ''' gets data within start :to ed range '''
         ind=[i for i in range(len(arr)) if arr[i]>=start and arr[i]<end]
         return ind
 
     def find_peaks(self,a):
+        '''Obtain peaks in the histogram'''
         x = np.array(a)
         max = np.max(x)
         lenght = len(a)
         ret = []
         for i in range(lenght):
             ispeak = True
-            if i-1 > 0:
-                ispeak &= (x[i] > 1.8 * x[i-1])
-            if i+1 < lenght:
-                ispeak &= (x[i] > 1.8 * x[i+1])
-
-            ispeak &= (x[i] > 0.05 * max)
+            if i-1 > 0:Detect lane points Contains Helper class forby using a sliding window search, where the initial estimates for the sliding windows are made using an intensity-based histogram.
             if ispeak:
                 ret.append(i)
         return ret
 
     def ransac_polyfit(self,x, y, order=2, n=20, k=100, t=0.1, d=100, f=0.8):
-        # Thanks https://en.wikipedia.org/wiki/Random_sample_consensus
-        
-        # n – minimum number of data points required to fit the model
-        # k – maximum number of iterations allowed in the algorithm
-        # t – threshold value to determine when a data point fits a model
-        # d – number of close data points required to assert that a model fits well to data
-        # f – fraction of close data points required
-    
+        '''
+            polynomial fitting 
+            # Thanks https://en.wikipedia.org/wiki/Random_sample_consensus
+            
+            # n – minimupm number of data points required to fit the model
+            # k – maximum number of iterations allowed in the algorithm
+            # t – threshold value to determine when a data point fits a model
+            # d – number of close data points required to assert that a model fits well to data
+            # f – fraction of close data points required
+        '''
         besterr = np.inf
         bestfit = None
         for kk in range(len(x)):
@@ -68,13 +77,17 @@ class Lane:
                     besterr = thiserr
         return bestfit
 
-    def DisplayBins(self,x_val,y,color):
-        y_val=[y]*len(x_val)
-        plt.plot(x_val,y_val,c=color)
+    # def DisplayBins(self,x_val,y,color):
+
+    #     y_val=[y]*len(x_val)
+    #     plt.plot(x_val,y_val,c=color)
 
     
 
     def DetectLanes(self,data,hbin,vbin, start,min_x,max_x,num_lanes):
+        '''
+            sliding window approach to detects lane points
+        '''
         verticalBins = np.zeros((vbin, 4, num_lanes))
         lanes = np.zeros((vbin, 4, num_lanes))
         # verticalBins=[]
@@ -88,17 +101,7 @@ class Lane:
         for j in range(num_lanes):
 
                 laneStartY = startLanePoints[j]
-                # print('starting x',laneStartX [i],laneStartX[i+1])
-
-                # roi=[laneStartX[i], laneStartX[i+1], laneStartY - hbin/2, laneStartY + hbin/2, -math.inf, math.inf]
-
-                lowerbound=math.ceil(laneStartY - hbin)
-                upperbound=math.ceil(laneStartY + hbin)
-                # print('range y', lowerbound,upperbound)
-
-                # print('before ',len(data))
-                for i in range(vbin-1):
-
+                # print('starting x',laneStartX [i]Detect lane points by using a sliding window search, where the initial estimates for the sliding windows are made using an intensity-based histogram.
 
                     inds = np.where((data[:,0] < laneStartX[i+1] )& (data[:,0] >= laneStartX[i]) &
                             (data[:,1] < upperbound) & (data[:,1] >= lowerbound) )[0]
@@ -117,8 +120,7 @@ class Lane:
                         lanes[i,:,j]=val
                         startLanePoints[j]=roi_data[max_intensity,1]
 
-                        plt.scatter(roi_data[max_intensity,0],roi_data[max_intensity,1],s=3,c='hotpink')
+                        plt.scatter(roi_data[max_intensity,0],roi_data[max_intensity,1],s=10,c='yellow')
                         # plt.plot(roi_data[max_intensity,0],roi_data[max_intensity,1],color='green')
                  
         return lanes
-            

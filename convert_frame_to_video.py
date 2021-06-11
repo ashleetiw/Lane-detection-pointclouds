@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+
+'''
+   convert multiple frame to a single video
+'''
 import cv2
 import numpy as np
 import os
@@ -7,6 +11,13 @@ from os.path import isfile, join
 
 
 def convert_frames_to_video(pathIn,pathOut,fps):
+    '''
+        convert frames to video
+        Args:
+            pathIn : input path for frames 
+            pathOut: output path for video
+            fps:     frame per second 
+    '''
     frame_array = []
     files = [f for f in os.listdir(pathIn) if isfile(join(pathIn, f))]
     #for sorting the file names properly
