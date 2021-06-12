@@ -1,6 +1,6 @@
 #  Lane Detection on Small 3D Point Cloud Data
 The goal of the project is to detect the lanes for a small LIDAR point clouds.
-The approach used was detecting lanes using windows sliding search from  a multi-aspect airborne laser scanning point clouds which were recorded in a forward looking view.Since the resolution of the point cloud is low,deep learing approach or ML-unsueprvised learning will not work .Although Clustering has been used but for filtering out noise.
+The approach used was detecting lanes using windows sliding search from  a multi-aspect airborne laser scanning point clouds which were recorded in a forward looking view.Since the resolution of the point cloud is low,deep learing approach or ML-unsueprvised learning will not work .Although clustering has been used but for filtering out noise.
 
 ![Demonstration](https://github.com/ashleetiw/Lane-detection-pointclouds/blob/main/demo.gif)
 
@@ -21,7 +21,7 @@ Lane detection in lidar involves detection of the immediate left and right lanes
 `Class Lidar` contains methods to preprocess the lidar pointclouds 
 ### Region of interest extraction
 -`remove_noise` function uses DBSCAN clustering to remove noise from pointclouds data
--` render_lidar_on_image` in class `Image` retains only pointlcouds which overlays only within the range (0,image_width) and (0,image_height)
+-` render_lidar_on_image` in class `Image` retains only pointclouds which overlays only within the range (0,image_width) and (0,image_height)
 
 ![Demonstration](https://github.com/ashleetiw/Lane-detection-pointclouds/blob/main/img/lidarpoints.png)
 
